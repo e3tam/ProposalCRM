@@ -27,8 +27,8 @@ class CSVParser {
         }
         
         // Extract headers from first line
-        let headers = lines[0].components(separatedBy: ",").map { 
-            $0.trimmingCharacters(in: .whitespacesAndNewlines) 
+        let headers = lines[0].components(separatedBy: ",").map {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines)
         }
         
         guard !headers.isEmpty else {
@@ -40,8 +40,8 @@ class CSVParser {
         
         for i in 1..<lines.count {
             let line = lines[i]
-            let values = line.components(separatedBy: ",").map { 
-                $0.trimmingCharacters(in: .whitespacesAndNewlines) 
+            let values = line.components(separatedBy: ",").map {
+                $0.trimmingCharacters(in: .whitespacesAndNewlines)
             }
             
             // Skip if line doesn't match header count
@@ -108,7 +108,10 @@ class CSVParser {
             if let existingProduct = existingProducts.first {
                 // Update existing product
                 existingProduct.name = productData.name
-                existingProduct.description = productData.description
+                
+                // Fix: Use setValue(_:forKey:) instead of direct assignment for the description property
+                existingProduct.setValue(productData.description, forKey: "desc")
+                
                 existingProduct.category = productData.category
                 existingProduct.listPrice = productData.listPrice
                 existingProduct.partnerPrice = productData.partnerPrice
@@ -118,7 +121,10 @@ class CSVParser {
                 product.id = UUID()
                 product.code = productData.code
                 product.name = productData.name
-                product.description = productData.description
+                
+                // Fix: Use setValue(_:forKey:) instead of direct assignment for the description property
+                product.setValue(productData.description, forKey: "desc")
+                
                 product.category = productData.category
                 product.listPrice = productData.listPrice
                 product.partnerPrice = productData.partnerPrice
@@ -138,7 +144,10 @@ class CSVParser {
         for product in products {
             let code = product.code ?? ""
             let name = product.name ?? ""
-            let description = product.description ?? ""
+            
+            // Fix: Use value(forKey:) to get the description property
+            let description = product.value(forKey: "desc") as? String ?? ""
+            
             let category = product.category ?? ""
             let listPrice = String(format: "%.2f", product.listPrice)
             let partnerPrice = String(format: "%.2f", product.partnerPrice)

@@ -215,7 +215,7 @@ struct ProductImportView: View {
             product.id = UUID()
             product.code = csvProduct.code
             product.name = csvProduct.name
-            product.description = csvProduct.description
+            product.desc = csvProduct.description
             product.category = csvProduct.category
             product.listPrice = csvProduct.listPrice
             product.partnerPrice = csvProduct.partnerPrice

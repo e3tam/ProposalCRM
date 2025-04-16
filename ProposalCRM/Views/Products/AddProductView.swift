@@ -61,7 +61,7 @@ struct AddProductView: View {
         product.id = UUID()
         product.code = code
         product.name = name
-        product.description = productDescription
+        product.desc = productDescription
         product.category = category
         product.listPrice = Double(listPrice) ?? 0.0
         product.partnerPrice = Double(partnerPrice) ?? 0.0

@@ -202,8 +202,10 @@ struct ItemSelectionView: View {
         }
     }
     
+    // Fix: Convert FetchedResults to Array immediately, then apply filters
     private var filteredProducts: [Product] {
-        var filtered = products
+        // Start with converting FetchedResults to Array
+        var filtered = Array(products)
         
         // Apply category filter if selected
         if let category = selectedCategory {
@@ -213,13 +215,16 @@ struct ItemSelectionView: View {
         // Apply search text filter
         if !searchText.isEmpty {
             filtered = filtered.filter { product in
-                product.code?.localizedCaseInsensitiveContains(searchText) ?? false ||
-                product.name?.localizedCaseInsensitiveContains(searchText) ?? false ||
-                product.description?.localizedCaseInsensitiveContains(searchText) ?? false
+                // Fix: Handle optional strings properly without optional chaining on non-optional strings
+                let codeMatch = product.code != nil ? product.code!.localizedCaseInsensitiveContains(searchText) : false
+                let nameMatch = product.name != nil ? product.name!.localizedCaseInsensitiveContains(searchText) : false
+                let descMatch = product.desc != nil ? product.desc!.localizedCaseInsensitiveContains(searchText) : false
+                
+                return codeMatch || nameMatch || descMatch
             }
         }
         
-        return Array(filtered)
+        return filtered
     }
     
     private func toggleProductSelection(_ product: Product) {
@@ -246,7 +251,8 @@ struct ItemSelectionView: View {
     }
     
     private func selectedProductsArray() -> [Product] {
-        return products.filter { product in
+        // Fix: Convert FetchedResults to Array first, then filter
+        return Array(products).filter { product in
             if let id = product.id {
                 return selectedProducts.contains(id)
             }

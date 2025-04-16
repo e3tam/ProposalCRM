@@ -49,7 +49,7 @@ struct ExpensesView: View {
     private func addExpense() {
         let expense = Expense(context: viewContext)
         expense.id = UUID()
-        expense.description = description
+        expense.desc = description
         expense.amount = amount
         expense.proposal = proposal
         

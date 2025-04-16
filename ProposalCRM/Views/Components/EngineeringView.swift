@@ -70,7 +70,7 @@ struct EngineeringView: View {
     private func addEngineering() {
         let engineering = Engineering(context: viewContext)
         engineering.id = UUID()
-        engineering.description = description
+        engineering.desc = description
         engineering.days = days
         engineering.rate = rate
         engineering.amount = amount

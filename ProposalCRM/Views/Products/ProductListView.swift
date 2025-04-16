@@ -100,7 +100,7 @@ struct ProductListView: View {
                                 Text(product.formattedName)
                                     .font(.headline)
                                 
-                                Text(product.description ?? "")
+                                Text(product.desc ?? "")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                     .lineLimit(2)
@@ -148,8 +148,10 @@ struct ProductListView: View {
         }
     }
     
+    // Fix: Convert FetchedResults to Array immediately, then apply filters
     private var filteredProducts: [Product] {
-        var filtered = products
+        // Start with converting FetchedResults to Array
+        var filtered = Array(products)
         
         // Apply category filter if selected
         if let category = selectedCategory {
@@ -161,11 +163,11 @@ struct ProductListView: View {
             filtered = filtered.filter { product in
                 product.code?.localizedCaseInsensitiveContains(searchText) ?? false ||
                 product.name?.localizedCaseInsensitiveContains(searchText) ?? false ||
-                product.description?.localizedCaseInsensitiveContains(searchText) ?? false
+                product.desc?.localizedCaseInsensitiveContains(searchText) ?? false
             }
         }
         
-        return Array(filtered)
+        return filtered
     }
     
     private func deleteProducts(offsets: IndexSet) {

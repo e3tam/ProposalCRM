@@ -75,6 +75,8 @@ struct ProposalListView: View {
                 .padding()
             } else {
                 List {
+                    // Fix: Use ForEach with filteredProposals directly
+                    // Instead of trying to convert FetchedResults to Array
                     ForEach(filteredProposals, id: \.self) { proposal in
                         NavigationLink(destination: ProposalDetailView(proposal: proposal)) {
                             VStack(alignment: .leading, spacing: 8) {
@@ -128,27 +130,35 @@ struct ProposalListView: View {
         }
     }
     
+    // Fix: Changed the return type to [Proposal] and made sure we don't assign back to FetchedResults
     private var filteredProposals: [Proposal] {
-        var filtered = proposals
-        
-        // Apply status filter if selected
-        if let status = selectedStatus {
-            filtered = filtered.filter { $0.status == status }
-        }
-        
-        // Apply search text filter
-        if !searchText.isEmpty {
-            filtered = filtered.filter { proposal in
-                proposal.number?.localizedCaseInsensitiveContains(searchText) ?? false ||
-                proposal.customer?.name?.localizedCaseInsensitiveContains(searchText) ?? false
+        // Filter the proposals based on search text and selected status
+        let filtered = proposals.filter { proposal in
+            // Apply status filter if selected
+            if let status = selectedStatus, proposal.status != status {
+                return false
             }
+            
+            // Apply search text filter if entered
+            if !searchText.isEmpty {
+                let matchesNumber = proposal.number?.localizedCaseInsensitiveContains(searchText) ?? false
+                let matchesCustomer = proposal.customer?.name?.localizedCaseInsensitiveContains(searchText) ?? false
+                
+                if !matchesNumber && !matchesCustomer {
+                    return false
+                }
+            }
+            
+            return true
         }
         
+        // Return the filtered results as an array
         return Array(filtered)
     }
     
     private func deleteProposals(offsets: IndexSet) {
         withAnimation {
+            // Convert IndexSet to indices in the filtered array
             offsets.map { filteredProposals[$0] }.forEach(viewContext.delete)
             
             do {
