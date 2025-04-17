@@ -1,8 +1,7 @@
 // ProposalDetailView.swift
-// View a proposal's details with the enhanced product table and Apple Pencil notes
+// View a proposal's details with the enhanced product table
 
 import SwiftUI
-import PencilKit
 
 struct ProposalDetailView: View {
     @Environment(\.managedObjectContext) private var viewContext
@@ -14,12 +13,6 @@ struct ProposalDetailView: View {
     @State private var showingCustomTaxForm = false
     @State private var showingEditProposal = false
     @State private var showingFinancialDetails = false
-    
-    // State for Pencil Notes
-    @State private var drawingData: Data? = nil
-    
-    // State for Attachments
-    @State private var attachments: [ProposalAttachment] = []
     
     var body: some View {
         ScrollView {
@@ -125,28 +118,7 @@ struct ProposalDetailView: View {
                     }
                 }
                 
-                // NEW: Apple Pencil Notes Section
-                VStack(alignment: .leading) {
-                    PencilNotesView(drawingData: $drawingData) {
-                        // Save drawing to proposal
-                        saveDrawing()
-                    }
-                }
-                .padding()
-                .background(Color(UIColor.systemBackground))
-                .cornerRadius(10)
-                .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-                
-                // NEW: Attachments Section
-                VStack(alignment: .leading) {
-                    AttachmentsView(proposal: proposal, attachments: $attachments)
-                }
-                .padding()
-                .background(Color(UIColor.systemBackground))
-                .cornerRadius(10)
-                .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-                
-                // Financial Summary
+                // Financial Summary - Safe version without custom properties
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
                         Text("Financial Summary")
@@ -277,10 +249,6 @@ struct ProposalDetailView: View {
         .sheet(isPresented: $showingFinancialDetails) {
             FinancialSummaryDetailView(proposal: proposal)
         }
-        .onAppear {
-            loadDrawingData()
-            loadAttachments()
-        }
     }
     
     // Calculate partner cost for all items
@@ -298,64 +266,5 @@ struct ProposalDetailView: View {
         totalCost += proposal.subtotalExpenses
         
         return totalCost
-    }
-    
-    // MARK: - Drawing Methods
-    
-    // Load drawing data from proposal
-    private func loadDrawingData() {
-        // In a real implementation, you would store this in Core Data or a file
-        // For now, we'll just initialize it to nil and store it in memory
-        // This could be stored in UserDefaults or a file for persistence
-        
-        if let proposalId = proposal.id?.uuidString {
-            if let savedData = UserDefaults.standard.data(forKey: "drawing_\(proposalId)") {
-                self.drawingData = savedData
-            }
-        }
-    }
-    
-    // Save drawing data to proposal
-    private func saveDrawing() {
-        if let proposalId = proposal.id?.uuidString, let data = drawingData {
-            UserDefaults.standard.set(data, forKey: "drawing_\(proposalId)")
-        }
-    }
-    
-    // MARK: - Attachments Methods
-    
-    // Load attachments for proposal
-    private func loadAttachments() {
-        // In a real implementation, you would store this in Core Data
-        // For now, we'll just use some sample data
-        
-        // Check if we have any saved attachments
-        if let proposalId = proposal.id?.uuidString {
-            // This is simulating retrieving attachments - in a real app, you'd use Core Data or file storage
-            // For demo purposes only
-            if attachments.isEmpty {
-                // Create some sample attachments
-                attachments = [
-                    ProposalAttachment(
-                        name: "Product Specifications.pdf",
-                        fileType: "pdf",
-                        date: Date().addingTimeInterval(-86400),
-                        fileSize: 1_245_000
-                    ),
-                    ProposalAttachment(
-                        name: "Client Meeting Notes.docx",
-                        fileType: "docx",
-                        date: Date().addingTimeInterval(-172800),
-                        fileSize: 85_000
-                    ),
-                    ProposalAttachment(
-                        name: "Project Timeline.xlsx",
-                        fileType: "xlsx",
-                        date: Date().addingTimeInterval(-259200),
-                        fileSize: 350_000
-                    )
-                ]
-            }
-        }
     }
 }

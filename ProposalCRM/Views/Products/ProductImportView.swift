@@ -1,597 +1,626 @@
 // ProductImportView.swift
-// Debug version with extensive logging
+// Simplified and fixed version for reliable CSV import
 
 import SwiftUI
 import UniformTypeIdentifiers
+import CoreData
 
 struct ProductImportView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.presentationMode) var presentationMode
     
     @State private var isImporting = false
-    @State private var importedCSVString: String?
-    @State private var importedProducts: [CSVProduct] = []
-    @State private var showPreview = false
-    @State private var errorMessage: String?
-    @State private var showError = false
+    @State private var importedCSVString: String? = nil
     @State private var isImportingData = false
-    @State private var importProgress: Float = 0.0
-    @State private var processingStatus = "Ready to import"
-    @State private var debugInfo: String = ""
-    @State private var showDebugInfo = false
+    @State private var progress: Float = 0.0
+    @State private var status = "Ready to import"
+    @State private var debugText = ""
+    @State private var showDebug = false
+    @State private var errorMessage: String? = nil
+    @State private var showError = false
+    @State private var showDeleteConfirmation = false
+    @State private var parsedProducts: [ImportProduct] = []
+    @State private var showParsedProducts = false
     
-    struct CSVProduct: Identifiable {
+    // Model for imported products
+    struct ImportProduct: Identifiable {
         let id = UUID()
         let code: String
         let name: String
+        let description: String
+        let category: String
         let listPrice: Double
         let partnerPrice: Double
-        let discount: Int
     }
     
     var body: some View {
         NavigationView {
-            VStack {
-                if importedCSVString == nil {
-                    VStack(spacing: 20) {
-                        Image(systemName: "doc.text")
-                            .font(.system(size: 60))
-                            .foregroundColor(.blue)
-                        
-                        Text("Import Products from CSV")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        
-                        Text("Use a CSV file with Product ID, Description, List Price, Partner Price and Discount columns")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding()
-                        
-                        Button(action: {
-                            isImporting = true
-                        }) {
-                            HStack {
-                                Image(systemName: "square.and.arrow.down")
-                                Text("Select CSV File")
-                            }
-                            .frame(minWidth: 200)
-                            .padding()
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
-                        }
-                    }
-                    .padding()
-                } else if importProgress < 1.0 && !showPreview {
-                    // Show processing screen with progress
-                    VStack(spacing: 20) {
-                        ProgressView(value: importProgress)
-                            .progressViewStyle(LinearProgressViewStyle())
-                            .padding()
-                        
-                        Text("Processing CSV file...")
-                            .font(.headline)
-                        
-                        Text(processingStatus)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        
-                        Button(action: {
-                            // Toggle debug info
-                            showDebugInfo.toggle()
-                        }) {
-                            Text(showDebugInfo ? "Hide Debug Info" : "Show Debug Info")
-                                .foregroundColor(.blue)
-                                .padding(.vertical, 8)
-                        }
-                        
-                        if showDebugInfo {
-                            ScrollView {
-                                Text(debugInfo)
-                                    .font(.system(size: 12, design: .monospaced))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding()
-                            }
-                            .frame(height: 200)
-                            .background(Color.black.opacity(0.1))
-                            .cornerRadius(8)
-                        }
-                        
-                        Button(action: {
-                            // Cancel import
-                            importedCSVString = nil
-                            importedProducts = []
-                            importProgress = 0.0
-                            processingStatus = "Ready to import"
-                            debugInfo = ""
-                        }) {
-                            Text("Cancel")
-                                .foregroundColor(.red)
-                                .padding()
-                        }
-                    }
-                    .padding()
-                } else if showPreview {
-                    VStack {
-                        // Preview header
-                        HStack {
-                            Text("Products to Import: \(importedProducts.count)")
-                                .font(.headline)
-                            
-                            Spacer()
-                            
-                            Button(action: {
-                                showDebugInfo.toggle()
-                            }) {
-                                Text(showDebugInfo ? "Hide Debug" : "Show Debug")
-                                    .foregroundColor(.blue)
-                            }
-                            
-                            Spacer()
-                            
-                            Button(action: {
-                                importedCSVString = nil
-                                importedProducts = []
-                                showPreview = false
-                                importProgress = 0.0
-                                processingStatus = "Ready to import"
-                                debugInfo = ""
-                            }) {
-                                Text("Cancel")
-                                    .foregroundColor(.red)
-                            }
-                        }
-                        .padding(.horizontal)
-                        
-                        if showDebugInfo {
-                            ScrollView {
-                                Text(debugInfo)
-                                    .font(.system(size: 12, design: .monospaced))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding()
-                            }
-                            .frame(height: 200)
-                            .background(Color.black.opacity(0.1))
-                            .cornerRadius(8)
-                            .padding(.horizontal)
-                        }
-                        
-                        // Summary at the top
-                        VStack(spacing: 5) {
-                            HStack {
-                                Text("List: €\(String(format: "%.2f", importedProducts.reduce(0.0) { $0 + $1.listPrice }))")
-                                    .foregroundColor(.primary)
-                                Spacer()
-                                Text("Partner: €\(String(format: "%.2f", importedProducts.reduce(0.0) { $0 + $1.partnerPrice }))")
-                                    .foregroundColor(.blue)
-                            }
-                            
-                            HStack {
-                                let avgDiscount = importedProducts.isEmpty ? 0 :
-                                    importedProducts.reduce(0) { $0 + $1.discount } / importedProducts.count
-                                Text("Discount: \(avgDiscount)%")
-                                    .foregroundColor(.green)
-                                Spacer()
-                            }
-                        }
-                        .padding()
-                        .background(Color.gray.opacity(0.2))
-                        .cornerRadius(8)
-                        .padding(.horizontal)
-                        
-                        // Products preview
-                        if importedProducts.isEmpty {
-                            VStack(spacing: 20) {
-                                Image(systemName: "exclamationmark.triangle")
-                                    .font(.system(size: 50))
-                                    .foregroundColor(.orange)
-                                
-                                Text("No products found in the CSV file")
-                                    .font(.headline)
-                                
-                                Text("Please check the file format and try again")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(Color.gray.opacity(0.1))
-                            .cornerRadius(8)
-                            .padding()
-                        } else {
-                            List {
-                                ForEach(importedProducts.prefix(50), id: \.id) { product in
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(product.code)
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                        
-                                        Text(product.name)
-                                            .font(.headline)
-                                            .lineLimit(2)
-                                        
-                                        HStack {
-                                            Text("List: €\(String(format: "%.2f", product.listPrice))")
-                                                .font(.subheadline)
-                                            
-                                            Spacer()
-                                            
-                                            Text("Partner: €\(String(format: "%.2f", product.partnerPrice))")
-                                                .font(.subheadline)
-                                                .foregroundColor(.blue)
-                                        }
-                                        
-                                        Text("Discount: \(product.discount)%")
-                                            .font(.caption)
-                                            .foregroundColor(.green)
-                                    }
-                                    .padding(.vertical, 4)
-                                }
-                                
-                                if importedProducts.count > 50 {
-                                    Text("... and \(importedProducts.count - 50) more items")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                        .padding()
-                                }
-                            }
-                        }
-                        
-                        // Import button
-                        Button(action: {
-                            isImportingData = true
-                            saveImportedProducts()
-                        }) {
-                            if isImportingData {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle())
-                            } else {
-                                Text("Import \(importedProducts.count) Products")
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(importedProducts.isEmpty ? Color.gray : Color.green)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(10)
-                            }
-                        }
-                        .disabled(importedProducts.isEmpty || isImportingData)
-                        .padding()
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Header section
+                    if importedCSVString == nil && !isImportingData {
+                        initialView
+                    } else if isImportingData {
+                        importProgressView
+                    } else if showParsedProducts {
+                        productPreviewView
                     }
                 }
+                .padding()
             }
             .navigationTitle("Import Products")
             .sheet(isPresented: $isImporting) {
-                DocumentPicker(importedCSVString: $importedCSVString, errorMessage: $errorMessage)
+                DocumentPicker(csvString: $importedCSVString, errorMessage: $errorMessage)
                     .onDisappear {
                         if let csvString = importedCSVString {
-                            // Start parsing in background to avoid freezing UI
-                            DispatchQueue.global(qos: .userInitiated).async {
-                                parseCSV(csvString)
-                            }
+                            parseCSV(csvString)
                         }
                     }
             }
-            .alert(isPresented: $showError) {
-                Alert(
-                    title: Text("Import Error"),
-                    message: Text(errorMessage ?? "Unknown error occurred"),
-                    dismissButton: .default(Text("OK"))
-                )
+            .alert("Error", isPresented: $showError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(errorMessage ?? "An error occurred")
+            }
+            .alert("Delete All Products", isPresented: $showDeleteConfirmation) {
+                Button("Delete All", role: .destructive) {
+                    deleteAllProducts()
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("Are you sure you want to delete all products from the database? This action cannot be undone.")
             }
         }
     }
     
-    private func parseCSV(_ csvString: String) {
-        // Reset state
-        importedProducts = []
-        importProgress = 0.0
-        debugInfo = ""
-        
-        addDebugInfo("Starting CSV parsing...")
-        addDebugInfo("CSV length: \(csvString.count) characters")
-        
-        if csvString.count > 500 {
-            // Show first 500 chars of CSV
-            let startIndex = csvString.startIndex
-            let endIndex = csvString.index(startIndex, offsetBy: min(500, csvString.count))
-            let preview = csvString[startIndex..<endIndex]
-            addDebugInfo("CSV Preview (first 500 chars):\n\(preview)")
-        } else {
-            addDebugInfo("CSV Content:\n\(csvString)")
-        }
-        
-        DispatchQueue.main.async {
-            processingStatus = "Analyzing CSV format..."
-        }
-        
-        // Split into lines
-        var lines = csvString.components(separatedBy: .newlines)
-        addDebugInfo("Found \(lines.count) lines in CSV")
-        
-        // Filter out empty lines
-        lines = lines.filter { !$0.trimmed.isEmpty }
-        addDebugInfo("After filtering empty lines: \(lines.count) lines")
-        
-        guard lines.count > 0 else {
-            addDebugInfo("No non-empty lines found in CSV")
-            DispatchQueue.main.async {
-                errorMessage = "CSV file is empty or contains no valid data"
-                showError = true
-                importProgress = 1.0
-                showPreview = true
+    // Initial view with import and delete buttons
+    private var initialView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "doc.text")
+                .font(.system(size: 60))
+                .foregroundColor(.blue)
+            
+            Text("Import Products from CSV")
+                .font(.title2)
+                .fontWeight(.bold)
+            
+            Text("Use a CSV file with columns for Code, Name, Description, Category, List Price, and Partner Price")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding()
+            
+            Button(action: {
+                isImporting = true
+            }) {
+                HStack {
+                    Image(systemName: "square.and.arrow.down")
+                    Text("Select CSV File")
+                }
+                .frame(minWidth: 200)
+                .padding()
+                .background(Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(10)
             }
-            return
-        }
-        
-        // First line is assumed to be the header
-        let headerLine = lines[0]
-        addDebugInfo("Header line: \(headerLine)")
-        
-        // Try several different parsing strategies
-        // 1. Standard comma-separated
-        // 2. Tab-separated
-        // 3. Semicolon-separated
-        
-        // First try comma-separated (standard CSV)
-        var headers = parseCSVLine(headerLine, separator: ",")
-        var separator = ","
-        
-        // If we only got one column, try tab
-        if headers.count <= 1 {
-            headers = parseCSVLine(headerLine, separator: "\t")
-            separator = "\t"
-            addDebugInfo("Trying tab separator: found \(headers.count) columns")
-        }
-        
-        // If still only one column, try semicolon
-        if headers.count <= 1 {
-            headers = parseCSVLine(headerLine, separator: ";")
-            separator = ";"
-            addDebugInfo("Trying semicolon separator: found \(headers.count) columns")
-        }
-        
-        addDebugInfo("Using separator: '\(separator == "\t" ? "TAB" : separator)'")
-        addDebugInfo("Detected headers: \(headers.joined(separator: ", "))")
-        
-        // Look for the columns we need
-        let productIdIndex = findColumnIndex(headers, for: ["Product ID", "ProductID", "Product", "Code", "ID"])
-        let descriptionIndex = findColumnIndex(headers, for: ["Description", "Desc", "Product Name", "Name"])
-        let listPriceIndex = findColumnIndex(headers, for: ["List Price", "ListPrice", "Price", "List"])
-        let partnerPriceIndex = findColumnIndex(headers, for: ["Partner Price", "PartnerPrice", "Partner", "Wholesale"])
-        let discountIndex = findColumnIndex(headers, for: ["Discount", "Disc", "Discount %", "Percentage"])
-        
-        addDebugInfo("Column indices: Product ID=\(productIdIndex), Description=\(descriptionIndex), List Price=\(listPriceIndex), Partner Price=\(partnerPriceIndex), Discount=\(discountIndex)")
-        
-        // Check if we found the necessary columns
-        if productIdIndex < 0 || descriptionIndex < 0 || listPriceIndex < 0 ||
-           partnerPriceIndex < 0 || discountIndex < 0 {
             
-            // If automatic detection failed, try fixed column indices based on the screenshot
-            addDebugInfo("Couldn't detect all columns automatically. Trying fixed column indices based on the example...")
+            // Delete All Products Button
+            Button(action: {
+                showDeleteConfirmation = true
+            }) {
+                HStack {
+                    Image(systemName: "trash")
+                    Text("Delete All Products")
+                }
+                .frame(minWidth: 200)
+                .padding()
+                .background(Color.red)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+            }
+            .padding(.top, 20)
+        }
+    }
+    
+    // Import progress view
+    private var importProgressView: some View {
+        VStack(spacing: 20) {
+            ProgressView(value: progress)
+                .progressViewStyle(LinearProgressViewStyle())
+                .padding()
             
-            // Based on the screenshot, assuming columns are in this order:
-            // 0: Product ID, 1: Description, 2: List Price, 3: Partner Price, 4: Discount
-            if headers.count >= 5 {
-                // First try basic indices
-                var products = parseWithFixedIndices(lines, 0, 1, 2, 3, 4, separator)
+            Text(status)
+                .font(.headline)
+            
+            // Debug toggle button
+            Button(action: { showDebug.toggle() }) {
+                Text(showDebug ? "Hide Debug Info" : "Show Debug Info")
+                    .foregroundColor(.blue)
+                    .padding(.vertical, 8)
+            }
+            
+            // Debug info box
+            if showDebug {
+                ScrollView {
+                    Text(debugText)
+                        .font(.system(size: 12, design: .monospaced))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                }
+                .frame(height: 200)
+                .background(Color.black.opacity(0.1))
+                .cornerRadius(8)
+            }
+            
+            Button(action: {
+                // Cancel import
+                importedCSVString = nil
+                isImportingData = false
+                progress = 0.0
+                status = "Ready to import"
+                debugText = ""
+                parsedProducts = []
+            }) {
+                Text("Cancel")
+                    .foregroundColor(.red)
+                    .padding()
+            }
+        }
+    }
+    
+    // Product preview view
+    private var productPreviewView: some View {
+        VStack {
+            // Preview header
+            HStack {
+                Text("Products to Import: \(parsedProducts.count)")
+                    .font(.headline)
                 
-                if products.isEmpty && lines.count > 1 {
-                    // Try parsing without header row
-                    addDebugInfo("Trying to parse without header row...")
-                    var dataLines = lines
-                    if isLikelyHeader(lines[0]) {
-                        dataLines.removeFirst()
-                    }
-                    products = parseRawData(dataLines)
+                Spacer()
+                
+                Button(action: { showDebug.toggle() }) {
+                    Text(showDebug ? "Hide Debug" : "Show Debug")
+                        .foregroundColor(.blue)
                 }
                 
+                Spacer()
+                
+                Button(action: {
+                    importedCSVString = nil
+                    isImportingData = false
+                    progress = 0.0
+                    status = "Ready to import"
+                    debugText = ""
+                    parsedProducts = []
+                    showParsedProducts = false
+                }) {
+                    Text("Cancel")
+                        .foregroundColor(.red)
+                }
+            }
+            .padding(.horizontal)
+            
+            if showDebug {
+                ScrollView {
+                    Text(debugText)
+                        .font(.system(size: 12, design: .monospaced))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                }
+                .frame(height: 200)
+                .background(Color.black.opacity(0.1))
+                .cornerRadius(8)
+                .padding(.horizontal)
+            }
+            
+            // Summary stats
+            VStack(spacing: 5) {
+                HStack {
+                    Text("List: \(formatCurrency(parsedProducts.reduce(0.0) { $0 + $1.listPrice }))")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Text("Partner: \(formatCurrency(parsedProducts.reduce(0.0) { $0 + $1.partnerPrice }))")
+                        .foregroundColor(.blue)
+                }
+                
+                HStack {
+                    let avgDiscount = calculateAvgDiscount()
+                    Text("Avg Discount: \(String(format: "%.1f%%", avgDiscount))")
+                        .foregroundColor(.green)
+                    Spacer()
+                    
+                    let categories = Set(parsedProducts.map { $0.category }).filter { !$0.isEmpty }
+                    Text("\(categories.count) Categories")
+                        .foregroundColor(.orange)
+                }
+            }
+            .padding()
+            .background(Color.gray.opacity(0.2))
+            .cornerRadius(8)
+            .padding(.horizontal)
+            
+            // Product table preview
+            productTableView
+            
+            // Import button
+            Button(action: {
+                isImportingData = true
+                saveProducts()
+            }) {
+                if isImportingData {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle())
+                } else {
+                    Text("Import \(parsedProducts.count) Products")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(parsedProducts.isEmpty ? Color.gray : Color.green)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                }
+            }
+            .disabled(parsedProducts.isEmpty || isImportingData)
+            .padding()
+        }
+    }
+    
+    private var productTableView: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Table header
+            ScrollView(.horizontal, showsIndicators: true) {
+                HStack(spacing: 0) {
+                    Text("Code")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .frame(width: 100, alignment: .leading)
+                        .padding(.horizontal, 5)
+                    
+                    Divider().frame(height: 30)
+                    
+                    Text("Name")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .frame(width: 150, alignment: .leading)
+                        .padding(.horizontal, 5)
+                    
+                    Divider().frame(height: 30)
+                    
+                    Text("Category")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .frame(width: 100, alignment: .leading)
+                        .padding(.horizontal, 5)
+                    
+                    Divider().frame(height: 30)
+                    
+                    Text("List Price")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .frame(width: 90, alignment: .trailing)
+                        .padding(.horizontal, 5)
+                    
+                    Divider().frame(height: 30)
+                    
+                    Text("Partner")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .frame(width: 90, alignment: .trailing)
+                        .padding(.horizontal, 5)
+                    
+                    Divider().frame(height: 30)
+                    
+                    Text("Discount")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .frame(width: 80, alignment: .trailing)
+                        .padding(.horizontal, 5)
+                }
+                .padding(.vertical, 10)
+                .background(Color(UIColor.systemGray5))
+            }
+            
+            Divider()
+            
+            // Product rows
+            ScrollView {
+                if parsedProducts.isEmpty {
+                    Text("No products found")
+                        .foregroundColor(.secondary)
+                        .padding()
+                } else {
+                    LazyVStack(spacing: 0) {
+                        ForEach(parsedProducts.prefix(50)) { product in
+                            HStack(spacing: 0) {
+                                Text(product.code)
+                                    .font(.system(size: 14))
+                                    .frame(width: 100, alignment: .leading)
+                                    .padding(.horizontal, 5)
+                                    .lineLimit(1)
+                                
+                                Divider().frame(height: 40)
+                                
+                                Text(product.name)
+                                    .font(.system(size: 14))
+                                    .frame(width: 150, alignment: .leading)
+                                    .padding(.horizontal, 5)
+                                    .lineLimit(1)
+                                
+                                Divider().frame(height: 40)
+                                
+                                Text(product.category)
+                                    .font(.system(size: 14))
+                                    .frame(width: 100, alignment: .leading)
+                                    .padding(.horizontal, 5)
+                                    .lineLimit(1)
+                                
+                                Divider().frame(height: 40)
+                                
+                                Text(formatCurrency(product.listPrice))
+                                    .font(.system(size: 14))
+                                    .frame(width: 90, alignment: .trailing)
+                                    .padding(.horizontal, 5)
+                                
+                                Divider().frame(height: 40)
+                                
+                                Text(formatCurrency(product.partnerPrice))
+                                    .font(.system(size: 14))
+                                    .frame(width: 90, alignment: .trailing)
+                                    .padding(.horizontal, 5)
+                                
+                                Divider().frame(height: 40)
+                                
+                                let discount = calculateDiscount(list: product.listPrice, partner: product.partnerPrice)
+                                Text(String(format: "%.1f%%", discount))
+                                    .font(.system(size: 14))
+                                    .frame(width: 80, alignment: .trailing)
+                                    .padding(.horizontal, 5)
+                                    .foregroundColor(discount >= 20 ? .green : (discount >= 10 ? .orange : .red))
+                            }
+                            .padding(.vertical, 8)
+                            .background(Color(UIColor.systemBackground))
+                            
+                            Divider()
+                        }
+                        
+                        if parsedProducts.count > 50 {
+                            Text("... and \(parsedProducts.count - 50) more items")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .padding()
+                        }
+                    }
+                }
+            }
+            .frame(height: 300)
+        }
+        .background(Color(UIColor.systemBackground))
+        .cornerRadius(10)
+        .padding(.horizontal)
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func log(_ message: String) {
+        debugText += message + "\n"
+        print(message)
+    }
+    
+    private func formatCurrency(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencySymbol = "$"
+        return formatter.string(from: NSNumber(value: value)) ?? "$\(String(format: "%.2f", value))"
+    }
+    
+    private func calculateDiscount(list: Double, partner: Double) -> Double {
+        if list <= 0 {
+            return 0
+        }
+        return ((list - partner) / list) * 100
+    }
+    
+    private func calculateAvgDiscount() -> Double {
+        if parsedProducts.isEmpty {
+            return 0
+        }
+        
+        let totalDiscount = parsedProducts.reduce(0.0) { sum, product in
+            return sum + calculateDiscount(list: product.listPrice, partner: product.partnerPrice)
+        }
+        
+        return totalDiscount / Double(parsedProducts.count)
+    }
+    
+    // MARK: - CSV Parsing
+    
+    private func parseCSV(_ csvString: String) {
+        isImportingData = true
+        progress = 0.1
+        status = "Analyzing CSV file..."
+        debugText = ""
+        parsedProducts = []
+        
+        log("Starting CSV parsing of \(csvString.count) characters")
+        
+        // Process in background
+        DispatchQueue.global(qos: .userInitiated).async {
+            // Detect line endings
+            var lineEnding = "\n"
+            if csvString.contains("\r\n") {
+                lineEnding = "\r\n"
+                log("Using Windows line endings (CRLF)")
+            } else if csvString.contains("\r") {
+                lineEnding = "\r"
+                log("Using Mac line endings (CR)")
+            } else {
+                log("Using Unix line endings (LF)")
+            }
+            
+            // Split into lines
+            let lines = csvString.components(separatedBy: lineEnding)
+                               .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            
+            log("Found \(lines.count) non-empty lines")
+            
+            if lines.isEmpty {
                 DispatchQueue.main.async {
-                    importedProducts = products
-                    importProgress = 1.0
-                    processingStatus = "Found \(products.count) valid products"
-                    showPreview = true
+                    errorMessage = "CSV file is empty or contains no valid data"
+                    showError = true
+                    isImportingData = false
                 }
                 return
             }
             
-            DispatchQueue.main.async {
-                errorMessage = "Could not identify all required columns in the CSV file"
-                addDebugInfo("Failed to detect required columns")
-                showError = true
-                importProgress = 1.0
-                showPreview = true
+            // Determine separator and analyze header
+            let firstLine = lines[0]
+            var separator = ","
+            
+            // Try to detect separator
+            if firstLine.contains("\t") {
+                separator = "\t"
+                log("Detected tab separator")
+            } else if firstLine.contains(";") {
+                separator = ";"
+                log("Detected semicolon separator")
+            } else {
+                log("Using comma separator")
             }
-            return
-        }
-        
-        DispatchQueue.main.async {
-            processingStatus = "Found \(lines.count - 1) potential product rows"
-        }
-        
-        // Process data rows with the detected column indices
-        let products = parseWithFixedIndices(
-            Array(lines.dropFirst()), // Skip header
-            productIdIndex,
-            descriptionIndex,
-            listPriceIndex,
-            partnerPriceIndex,
-            discountIndex,
-            separator
-        )
-        
-        // Update UI on main thread
-        DispatchQueue.main.async {
-            importedProducts = products
-            importProgress = 1.0
-            processingStatus = "Found \(products.count) valid products"
-            addDebugInfo("Successfully parsed \(products.count) products")
-            showPreview = true
+            
+            // Process in chunks to handle large files
+            DispatchQueue.main.async {
+                status = "Processing CSV data..."
+                progress = 0.2
+            }
+            
+            let chunkSize = 1000
+            let chunks = stride(from: 0, to: lines.count, by: chunkSize).map {
+                Array(lines[$0..<min($0 + chunkSize, lines.count)])
+            }
+            
+            log("Split into \(chunks.count) chunks of \(chunkSize) lines each")
+            
+            var allProducts: [ImportProduct] = []
+            let headerFields = parseLine(lines[0], separator: separator)
+            
+            // Map column indices
+            let codeIdx = findColumnIndex(headerFields, possibleNames: ["code", "id", "sku", "product id", "product code"])
+            let nameIdx = findColumnIndex(headerFields, possibleNames: ["name", "product name", "title", "description"])
+            let descIdx = findColumnIndex(headerFields, possibleNames: ["desc", "description", "details", "specs"])
+            let catIdx = findColumnIndex(headerFields, possibleNames: ["category", "type", "group", "cat"])
+            let listPriceIdx = findColumnIndex(headerFields, possibleNames: ["list price", "price", "msrp", "retail"])
+            let partnerPriceIdx = findColumnIndex(headerFields, possibleNames: ["partner price", "cost", "wholesale", "partner"])
+            
+            log("Column mapping: code=\(codeIdx), name=\(nameIdx), desc=\(descIdx), cat=\(catIdx), list=\(listPriceIdx), partner=\(partnerPriceIdx)")
+            
+            // Process each chunk
+            for (i, chunk) in chunks.enumerated() {
+                if i == 0 && isLikelyHeader(chunk[0]) {
+                    // Skip header row
+                    if chunk.count > 1 {
+                        processChunk(Array(chunk.dropFirst()), separator: separator, codeIdx: codeIdx, nameIdx: nameIdx,
+                                    descIdx: descIdx, catIdx: catIdx, listPriceIdx: listPriceIdx,
+                                    partnerPriceIdx: partnerPriceIdx, products: &allProducts)
+                    }
+                } else {
+                    processChunk(Array(chunk), separator: separator, codeIdx: codeIdx, nameIdx: nameIdx,
+                                descIdx: descIdx, catIdx: catIdx, listPriceIdx: listPriceIdx,
+                                partnerPriceIdx: partnerPriceIdx, products: &allProducts)
+                }
+                
+                DispatchQueue.main.async {
+                    progress = 0.2 + (0.7 * Float(i + 1) / Float(chunks.count))
+                    status = "Processed \(min((i + 1) * chunkSize, lines.count)) of \(lines.count) lines..."
+                }
+            }
+            
+            DispatchQueue.main.async {
+                parsedProducts = allProducts
+                log("Successfully parsed \(allProducts.count) products")
+                status = "Ready to import \(allProducts.count) products"
+                progress = 1.0
+                isImportingData = false
+                showParsedProducts = true
+            }
         }
     }
     
-    // Parse with fixed column indices
-    private func parseWithFixedIndices(_ lines: [String], _ pidx: Int, _ didx: Int, _ lpidx: Int, _ ppidx: Int, _ discidx: Int, _ separator: String) -> [CSVProduct] {
-        var products: [CSVProduct] = []
-        let totalRows = lines.count
-        
-        addDebugInfo("Parsing \(totalRows) data rows with fixed indices")
-        
-        for (i, line) in lines.enumerated() {
-            // Update progress periodically
-            if i % 100 == 0 || i == lines.count - 1 {
-                let progress = Float(i) / Float(totalRows)
-                DispatchQueue.main.async {
-                    importProgress = progress
-                    processingStatus = "Processed \(i) of \(totalRows) rows..."
-                }
-            }
-         
-            let columns = parseCSVLine(line, separator: separator)
+    private func processChunk(_ lines: [String], separator: String, codeIdx: Int, nameIdx: Int,
+                             descIdx: Int, catIdx: Int, listPriceIdx: Int, partnerPriceIdx: Int,
+                             products: inout [ImportProduct]) {
+        for line in lines {
+            let fields = parseLine(line, separator: separator)
             
-            // Skip rows that don't have enough columns
-            if columns.count <= max(pidx, didx, lpidx, ppidx, discidx) {
-                if i < 5 { // Only log the first few for brevity
-                    addDebugInfo("Row \(i) doesn't have enough columns: \(columns.count) < required max index \(max(pidx, didx, lpidx, ppidx, discidx))")
-                }
+            // Skip rows without enough fields
+            let maxIdx = [codeIdx, nameIdx, descIdx, catIdx, listPriceIdx, partnerPriceIdx].max() ?? 0
+            if fields.count <= maxIdx {
                 continue
             }
             
-            // Extract field values
-            let productId = columns[pidx].trimmed
-            let description = columns[didx].trimmed
-            let listPriceStr = columns[lpidx].trimmed
-            let partnerPriceStr = columns[ppidx].trimmed
-            let discountStr = columns[discidx].trimmed
+            // Extract fields with safe access
+            let code = (codeIdx >= 0 && codeIdx < fields.count) ? fields[codeIdx] : ""
+            let name = (nameIdx >= 0 && nameIdx < fields.count) ? fields[nameIdx] : ""
+            let description = (descIdx >= 0 && descIdx < fields.count) ? fields[descIdx] : ""
+            let category = (catIdx >= 0 && catIdx < fields.count) ? fields[catIdx] : ""
             
-            // Parse prices
-            let listPrice = parseEuroPrice(listPriceStr)
-            let partnerPrice = parseEuroPrice(partnerPriceStr)
-            let discount = parseDiscount(discountStr)
+            let listPriceStr = (listPriceIdx >= 0 && listPriceIdx < fields.count) ? fields[listPriceIdx] : "0"
+            let partnerPriceStr = (partnerPriceIdx >= 0 && partnerPriceIdx < fields.count) ? fields[partnerPriceIdx] : "0"
             
-            // Create product if we have valid data
-            if !productId.isEmpty {
-                let product = CSVProduct(
-                    code: productId,
-                    name: description,
+            // Parse prices safely
+            let listPrice = parsePrice(listPriceStr)
+            let partnerPrice = parsePrice(partnerPriceStr)
+            
+            // Only add valid products
+            if !code.isEmpty && !name.isEmpty && listPrice > 0 {
+                let product = ImportProduct(
+                    code: code,
+                    name: name,
+                    description: description,
+                    category: category,
                     listPrice: listPrice,
-                    partnerPrice: partnerPrice,
-                    discount: discount
+                    partnerPrice: partnerPrice > 0 ? partnerPrice : (listPrice * 0.75)
                 )
-                
                 products.append(product)
-                
-                // Log first few products for debugging
-                if products.count <= 5 {
-                    addDebugInfo("Added product: \(productId), Price: €\(listPrice), Partner: €\(partnerPrice), Disc: \(discount)%")
-                }
+            }
+        }
+    }
+    
+    private func parseLine(_ line: String, separator: String) -> [String] {
+        var fields: [String] = []
+        var currentField = ""
+        var inQuotes = false
+        
+        for char in line {
+            if char == "\"" {
+                inQuotes = !inQuotes
+            } else if String(char) == separator && !inQuotes {
+                fields.append(currentField.trimmingCharacters(in: .whitespacesAndNewlines))
+                currentField = ""
+            } else {
+                currentField.append(char)
             }
         }
         
-        return products
+        // Add the last field
+        fields.append(currentField.trimmingCharacters(in: .whitespacesAndNewlines))
+        
+        return fields
     }
     
-    // Try to parse rows without any header information
-    private func parseRawData(_ lines: [String]) -> [CSVProduct] {
-        var products: [CSVProduct] = []
+    private func findColumnIndex(_ headers: [String], possibleNames: [String]) -> Int {
+        // Convert headers to lowercase for case-insensitive matching
+        let lowercaseHeaders = headers.map { $0.lowercased() }
         
-        addDebugInfo("Trying raw data parsing for \(lines.count) lines...")
-        
-        for (i, line) in lines.enumerated() {
-            if i < 5 {
-                addDebugInfo("Raw line \(i): \(line)")
-            }
-            
-            // Try to extract product code, description and price
-            // Assume format might be like the screenshots
-            
-            // Check for common code patterns like "280-XXX-YYY" or "DM280-XXX-YYY"
-            if let codeRange = line.range(of: "(DM280|280)-[A-Za-z0-9]+-[A-Za-z0-9]+", options: .regularExpression) {
-                let code = String(line[codeRange])
-                var remainingText = line
-                
-                if let startIndex = line.range(of: code)?.lowerBound {
-                    remainingText = String(line[startIndex...])
-                }
-                
-                // Look for price patterns like "€ XXX,XX" or "€XXX.XX"
-                var listPrice: Double = 0
-                var partnerPrice: Double = 0
-                var discount: Int = 26 // Default based on samples
-                
-                // Try to find a price in the remaining text
-                if let priceRange = remainingText.range(of: "€\\s*[0-9.,]+", options: .regularExpression) {
-                    let priceText = String(remainingText[priceRange])
-                    listPrice = parseEuroPrice(priceText)
-                    
-                    // Calculate partner price based on discount
-                    partnerPrice = listPrice * (1.0 - Double(discount) / 100.0)
-                }
-                
-                // Get description by removing code and price
-                var description = remainingText
-                    .replacingOccurrences(of: code, with: "")
-                    .trimmed
-                
-                // Remove any remaining price text
-                if let priceRange = description.range(of: "€\\s*[0-9.,]+", options: .regularExpression) {
-                    let priceText = String(description[priceRange])
-                    description = description.replacingOccurrences(of: priceText, with: "").trimmed
-                }
-                
-                // Clean up any separators in the description
-                description = description.replacingOccurrences(of: ";", with: " ")
-                    .replacingOccurrences(of: ",", with: " ")
-                    .trimmed
-                
-                // Only add if we have a code and it looks legitimate
-                if code.contains("280-") && !code.isEmpty {
-                    let product = CSVProduct(
-                        code: code,
-                        name: description,
-                        listPrice: listPrice,
-                        partnerPrice: partnerPrice,
-                        discount: discount
-                    )
-                    
-                    products.append(product)
-                    
-                    if products.count <= 5 {
-                        addDebugInfo("Parsed raw product: \(code), Price: €\(listPrice)")
-                    }
-                }
-            }
-        }
-        
-        return products
-    }
-    
-    // Check if a line is likely a header rather than data
-    private func isLikelyHeader(_ line: String) -> Bool {
-        // Headers usually don't contain product codes or prices
-        return !line.contains("280-") &&
-               !line.contains("DM280") &&
-               !line.contains("€") &&
-               (line.lowercased().contains("product") ||
-                line.lowercased().contains("description") ||
-                line.lowercased().contains("price"))
-    }
-    
-    // Find the index of a column by trying different possible header names
-    private func findColumnIndex(_ headers: [String], for possibleNames: [String]) -> Int {
-        // Try exact matches first
+        // First try exact matches
         for name in possibleNames {
-            for (index, header) in headers.enumerated() {
-                if header.trimmed.lowercased() == name.lowercased() {
-                    return index
-                }
+            if let index = lowercaseHeaders.firstIndex(of: name.lowercased()) {
+                return index
             }
         }
         
-        // Try contains matches
+        // Then try partial matches
         for name in possibleNames {
-            for (index, header) in headers.enumerated() {
-                if header.trimmed.lowercased().contains(name.lowercased()) {
+            for (index, header) in lowercaseHeaders.enumerated() {
+                if header.contains(name.lowercased()) {
                     return index
                 }
             }
@@ -600,122 +629,185 @@ struct ProductImportView: View {
         return -1
     }
     
-    // Parse a CSV line with specified separator
-    private func parseCSVLine(_ line: String, separator: String) -> [String] {
-        var result: [String] = []
-        var currentField = ""
-        var inQuotes = false
+    private func isLikelyHeader(_ line: String) -> Bool {
+        let lowercased = line.lowercased()
+        let headerTerms = ["product", "code", "name", "description", "price", "category", "id"]
         
-        for char in line {
-            if char == "\"" {
-                inQuotes = !inQuotes
-            } else if String(char) == separator && !inQuotes {
-                result.append(currentField)
-                currentField = ""
-            } else {
-                currentField.append(char)
+        var termCount = 0
+        for term in headerTerms {
+            if lowercased.contains(term) {
+                termCount += 1
             }
         }
         
-        // Add the last field
-        result.append(currentField)
-        
-        return result
+        return termCount >= 2
     }
     
-    // Parse price in Euro format (e.g. "€ 180,00" -> 180.00)
-    private func parseEuroPrice(_ priceString: String) -> Double {
-        // Remove Euro symbol, whitespace and clean the string
-        var cleaned = priceString
-            .replacingOccurrences(of: "€", with: "")
-            .trimmed
-        
-        // Replace comma with period for decimal point
-        cleaned = cleaned.replacingOccurrences(of: ",", with: ".")
-        
-        // Add debug info for troublesome prices
-        if !cleaned.isEmpty && Double(cleaned) == nil {
-            addDebugInfo("Failed to parse price: '\(priceString)' -> '\(cleaned)'")
+    private func parsePrice(_ str: String) -> Double {
+        // Remove currency symbols
+        var cleaned = str
+        for symbol in ["$", "€", "£", "¥"] {
+            cleaned = cleaned.replacingOccurrences(of: symbol, with: "")
         }
+        
+        // Remove spaces
+        cleaned = cleaned.replacingOccurrences(of: " ", with: "")
+        
+        // Replace comma with period
+        cleaned = cleaned.replacingOccurrences(of: ",", with: ".")
         
         return Double(cleaned) ?? 0.0
     }
     
-    // Parse discount percentage
-    private func parseDiscount(_ discountString: String) -> Int {
-        // Remove % symbol and whitespace
-        let cleaned = discountString
-            .replacingOccurrences(of: "%", with: "")
-            .trimmed
-        
-        return Int(cleaned) ?? 0
-    }
+    // MARK: - Database Operations
     
-    // Add debug information
-    private func addDebugInfo(_ info: String) {
-        debugInfo += info + "\n"
-        print(info)
-    }
-    
-    private func saveImportedProducts() {
-        // Update status
-        processingStatus = "Saving products to database..."
-        addDebugInfo("Starting to save \(importedProducts.count) products...")
+    private func saveProducts() {
+        status = "Saving products to database..."
+        progress = 0.0
+        log("Starting to save \(parsedProducts.count) products")
         
-        // Use a background context for better performance
+        // Use a background context
         let backgroundContext = PersistenceController.shared.container.newBackgroundContext()
         
-        // Group the saves in batches for better performance
-        let batchSize = 200
-        let totalBatches = (importedProducts.count + batchSize - 1) / batchSize
+        // Process in batches
+        let batchSize = 500
+        let batches = stride(from: 0, to: parsedProducts.count, by: batchSize).map {
+            Array(parsedProducts[$0..<min($0 + batchSize, parsedProducts.count)])
+        }
         
-        // Track progress
         var savedCount = 0
         
-        for batchIndex in 0..<totalBatches {
-            // Create a batch of products
-            let startIndex = batchIndex * batchSize
-            let endIndex = min(startIndex + batchSize, importedProducts.count)
-            let currentBatch = Array(importedProducts[startIndex..<endIndex])
-            
-            // Save this batch
-            backgroundContext.perform {
-                for csvProduct in currentBatch {
-                    let product = Product(context: backgroundContext)
-                    product.id = UUID()
-                    product.code = csvProduct.code
-                    product.name = csvProduct.name
-                    product.desc = ""
-                    product.category = ""
-                    product.listPrice = csvProduct.listPrice
-                    product.partnerPrice = csvProduct.partnerPrice
-                }
+        // Save first batch and continue with others
+        saveBatch(0, batches, backgroundContext, savedCount)
+    }
+    
+    private func saveBatch(_ index: Int, _ batches: [[ImportProduct]], _ context: NSManagedObjectContext, _ savedSoFar: Int) {
+        // Check if we're done
+        if index >= batches.count {
+            DispatchQueue.main.async {
+                log("All products saved successfully!")
+                errorMessage = "Successfully imported \(savedSoFar) products!"
+                showError = true
+                isImportingData = false
                 
-                // Save the context
+                // Return to initial state
+                importedCSVString = nil
+                parsedProducts = []
+                progress = 0.0
+                status = "Ready to import"
+                showParsedProducts = false
+                
+                // Dismiss the sheet
+                presentationMode.wrappedValue.dismiss()
+            }
+            return
+        }
+        
+        let batch = batches[index]
+        let batchSize = 500 // Define batchSize here
+        let startIndex = index * batchSize
+        
+        DispatchQueue.main.async {
+            status = "Saving batch \(index+1) of \(batches.count) (\(startIndex+1) to \(startIndex+batch.count))"
+            progress = Float(index) / Float(batches.count)
+        }
+        
+        // Save this batch
+        context.perform {
+            for product in batch {
+                // Check if product exists
+                let fetchRequest = NSFetchRequest<Product>(entityName: "Product")
+                fetchRequest.predicate = NSPredicate(format: "code == %@", product.code)
+                
                 do {
-                    try backgroundContext.save()
+                    let existingProducts = try context.fetch(fetchRequest)
                     
-                    // Update progress on main thread
-                    savedCount += currentBatch.count
-                    
-                    DispatchQueue.main.async {
-                        processingStatus = "Saved \(savedCount) of \(importedProducts.count) products..."
-                        addDebugInfo("Saved batch \(batchIndex+1)/\(totalBatches) with \(currentBatch.count) products")
-                        
-                        if batchIndex == totalBatches - 1 {
-                            // All done
-                            addDebugInfo("All products saved successfully!")
-                            presentationMode.wrappedValue.dismiss()
-                        }
+                    if let existingProduct = existingProducts.first {
+                        // Update existing product
+                        existingProduct.setValue(product.name, forKey: "name")
+                        existingProduct.setValue(product.description, forKey: "desc")
+                        existingProduct.setValue(product.category, forKey: "category")
+                        existingProduct.setValue(product.listPrice, forKey: "listPrice")
+                        existingProduct.setValue(product.partnerPrice, forKey: "partnerPrice")
+                    } else {
+                        // Create new product
+                        let newProduct = NSEntityDescription.insertNewObject(forEntityName: "Product", into: context)
+                        newProduct.setValue(UUID(), forKey: "id")
+                        newProduct.setValue(product.code, forKey: "code")
+                        newProduct.setValue(product.name, forKey: "name")
+                        newProduct.setValue(product.description, forKey: "desc")
+                        newProduct.setValue(product.category, forKey: "category")
+                        newProduct.setValue(product.listPrice, forKey: "listPrice")
+                        newProduct.setValue(product.partnerPrice, forKey: "partnerPrice")
                     }
                 } catch {
-                    let nsError = error as NSError
-                    DispatchQueue.main.async {
-                        errorMessage = "Failed to save products: \(nsError.localizedDescription)"
-                        addDebugInfo("Error saving batch \(batchIndex+1): \(nsError.localizedDescription)")
-                        showError = true
-                        isImportingData = false
+                    log("Error checking for existing product: \(error.localizedDescription)")
+                }
+            }
+            
+            // Save the context
+            do {
+                try context.save()
+                
+                // Update count and continue with next batch
+                let newSavedCount = savedSoFar + batch.count
+                log("Saved batch \(index+1) with \(batch.count) products. Total: \(newSavedCount)")
+                
+                // Process next batch with a delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    saveBatch(index + 1, batches, context, newSavedCount)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    errorMessage = "Failed to save products: \(error.localizedDescription)"
+                    log("Error saving batch \(index+1): \(error.localizedDescription)")
+                    showError = true
+                    isImportingData = false
+                }
+            }
+        }
+    }
+    
+    private func deleteAllProducts() {
+        log("Starting to delete all products...")
+        
+        // Use a background context
+        let backgroundContext = PersistenceController.shared.container.newBackgroundContext()
+        
+        backgroundContext.perform {
+            do {
+                // Count products
+                let countRequest = NSFetchRequest<Product>(entityName: "Product")
+                let count = try backgroundContext.count(for: countRequest)
+                
+                // Delete in batches of 1000
+                let batchSize = 1000
+                var deleted = 0
+                
+                while deleted < count {
+                    let fetchRequest = NSFetchRequest<Product>(entityName: "Product")
+                    fetchRequest.fetchLimit = batchSize
+                    
+                    let products = try backgroundContext.fetch(fetchRequest)
+                    
+                    for product in products {
+                        backgroundContext.delete(product)
                     }
+                    
+                    try backgroundContext.save()
+                    deleted += products.count
+                }
+                
+                DispatchQueue.main.async {
+                    log("Successfully deleted \(count) products")
+                    errorMessage = "Successfully deleted \(count) products"
+                    showError = true
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    log("Error deleting products: \(error.localizedDescription)")
+                    errorMessage = "Error deleting products: \(error.localizedDescription)"
+                    showError = true
                 }
             }
         }
@@ -724,11 +816,11 @@ struct ProductImportView: View {
 
 // Document picker for CSV files
 struct DocumentPicker: UIViewControllerRepresentable {
-    @Binding var importedCSVString: String?
+    @Binding var csvString: String?
     @Binding var errorMessage: String?
     
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [UTType.commaSeparatedText])
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [UTType.commaSeparatedText, UTType.text])
         picker.delegate = context.coordinator
         picker.allowsMultipleSelection = false
         return picker
@@ -762,14 +854,23 @@ struct DocumentPicker: UIViewControllerRepresentable {
             
             do {
                 let data = try Data(contentsOf: url)
+                
+                // Try UTF-8 first
                 if let string = String(data: data, encoding: .utf8) {
-                    parent.importedCSVString = string
-                } else if let string = String(data: data, encoding: .isoLatin1) {
-                    // Try ISO Latin 1 encoding if UTF-8 fails
-                    parent.importedCSVString = string
-                } else if let string = String(data: data, encoding: .windowsCP1252) {
-                    // Try Windows CP1252 encoding if others fail
-                    parent.importedCSVString = string
+                    parent.csvString = string
+                    return
+                }
+                
+                // Try ISO Latin 1
+                if let string = String(data: data, encoding: .isoLatin1) {
+                    parent.csvString = string
+                    return
+                }
+                
+                // Fallback
+                let fallbackString = String(decoding: data, as: UTF8.self)
+                if !fallbackString.isEmpty {
+                    parent.csvString = fallbackString
                 } else {
                     parent.errorMessage = "Failed to convert file to text - unsupported encoding"
                 }
@@ -777,12 +878,5 @@ struct DocumentPicker: UIViewControllerRepresentable {
                 parent.errorMessage = "Failed to read file: \(error.localizedDescription)"
             }
         }
-    }
-}
-
-// String extension to handle trimming
-extension String {
-    var trimmed: String {
-        return self.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
