@@ -1,5 +1,5 @@
 // ItemSelectionView.swift
-// Select products to add to a proposal
+// Select products to add to a proposal with enhanced calculations
 
 import SwiftUI
 import CoreData
@@ -20,6 +20,9 @@ struct ItemSelectionView: View {
     @State private var selectedProducts: Set<UUID> = []
     @State private var quantities: [UUID: Double] = [:]
     @State private var discounts: [UUID: Double] = [:]
+    @State private var multipliers: [UUID: Double] = [:]
+    @State private var applyCustomTax: [UUID: Bool] = [:]
+    @State private var customDescriptions: [UUID: String] = [:]
     
     var categories: [String] {
         let categorySet = Set(products.compactMap { $0.category })
@@ -141,15 +144,73 @@ struct ItemSelectionView: View {
                                                 .frame(width: 50, alignment: .trailing)
                                         }
                                         
+                                        // New multiplier field
                                         HStack {
-                                            Text("Unit: \(String(format: "%.2f", product.listPrice * (1 - (discounts[product.id!] ?? 0) / 100)))")
-                                                .font(.subheadline)
+                                            Text("Multiplier:")
                                             
-                                            Spacer()
+                                            Slider(
+                                                value: Binding(
+                                                    get: { self.multipliers[product.id!] ?? 1.0 },
+                                                    set: { self.multipliers[product.id!] = $0 }
+                                                ),
+                                                in: 0.5...2,
+                                                step: 0.05
+                                            )
                                             
-                                            Text("Total: \(String(format: "%.2f", calculateTotal(for: product)))")
-                                                .font(.headline)
-                                                .foregroundColor(.blue)
+                                            Text("\(String(format: "%.2f", multipliers[product.id!] ?? 1.0))x")
+                                                .frame(width: 50, alignment: .trailing)
+                                        }
+                                        
+                                        // New custom description field
+                                        TextField("Custom Description", text: Binding(
+                                            get: { self.customDescriptions[product.id!] ?? "" },
+                                            set: { self.customDescriptions[product.id!] = $0 }
+                                        ))
+                                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                                        .padding(.vertical, 4)
+                                        
+                                        // New custom tax checkbox
+                                        Toggle("Apply Custom Tax", isOn: Binding(
+                                            get: { self.applyCustomTax[product.id!] ?? false },
+                                            set: { self.applyCustomTax[product.id!] = $0 }
+                                        ))
+                                        
+                                        Divider()
+                                        
+                                        // Pricing summary
+                                        Group {
+                                            HStack {
+                                                Text("Unit List: \(String(format: "%.2f", product.listPrice))")
+                                                    .font(.subheadline)
+                                                
+                                                Spacer()
+                                                
+                                                Text("Unit Partner: \(String(format: "%.2f", product.partnerPrice))")
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.blue)
+                                            }
+                                            
+                                            HStack {
+                                                Text("Extended List: \(String(format: "%.2f", calculateExtendedListPrice(for: product)))")
+                                                    .font(.subheadline)
+                                                
+                                                Spacer()
+                                                
+                                                Text("Extended Partner: \(String(format: "%.2f", calculateExtendedPartnerPrice(for: product)))")
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.blue)
+                                            }
+                                            
+                                            HStack {
+                                                Text("Customer Price: \(String(format: "%.2f", calculateExtendedCustomerPrice(for: product)))")
+                                                    .font(.headline)
+                                                
+                                                Spacer()
+                                                
+                                                Text("Profit: \(String(format: "%.2f", calculateTotalProfit(for: product)))")
+                                                    .font(.headline)
+                                                    .foregroundColor(calculateTotalProfit(for: product) > 0 ? .green : .red)
+                                            }
                                         }
                                     }
                                     .padding()
@@ -159,12 +220,12 @@ struct ItemSelectionView: View {
                             }
                             .padding(.horizontal)
                         }
-                        .frame(height: 200)
+                        .frame(height: 300)
                         
                         // Summary and add button
                         HStack {
                             VStack(alignment: .leading) {
-                                Text("Total: \(String(format: "%.2f", calculateGrandTotal()))")
+                                Text("Total: \(String(format: "%.2f", calculateGrandTotalCustomerPrice()))")
                                     .font(.headline)
                                 
                                 Text("\(selectedProducts.count) products, \(calculateTotalQuantity()) items")
@@ -202,7 +263,6 @@ struct ItemSelectionView: View {
         }
     }
     
-    // Fix: Convert FetchedResults to Array immediately, then apply filters
     private var filteredProducts: [Product] {
         // Start with converting FetchedResults to Array
         var filtered = Array(products)
@@ -215,7 +275,7 @@ struct ItemSelectionView: View {
         // Apply search text filter
         if !searchText.isEmpty {
             filtered = filtered.filter { product in
-                // Fix: Handle optional strings properly without optional chaining on non-optional strings
+                // Handle optional strings properly without optional chaining on non-optional strings
                 let codeMatch = product.code != nil ? product.code!.localizedCaseInsensitiveContains(searchText) : false
                 let nameMatch = product.name != nil ? product.name!.localizedCaseInsensitiveContains(searchText) : false
                 let descMatch = product.desc != nil ? product.desc!.localizedCaseInsensitiveContains(searchText) : false
@@ -239,6 +299,15 @@ struct ItemSelectionView: View {
                 if discounts[id] == nil {
                     discounts[id] = 0
                 }
+                if multipliers[id] == nil {
+                    multipliers[id] = 1.0
+                }
+                if applyCustomTax[id] == nil {
+                    applyCustomTax[id] = false
+                }
+                if customDescriptions[id] == nil {
+                    customDescriptions[id] = ""
+                }
             }
         }
     }
@@ -251,7 +320,6 @@ struct ItemSelectionView: View {
     }
     
     private func selectedProductsArray() -> [Product] {
-        // Fix: Convert FetchedResults to Array first, then filter
         return Array(products).filter { product in
             if let id = product.id {
                 return selectedProducts.contains(id)
@@ -260,20 +328,41 @@ struct ItemSelectionView: View {
         }
     }
     
-    private func calculateTotal(for product: Product) -> Double {
+    // Calculate extended partner price (unit partner price * quantity)
+    private func calculateExtendedPartnerPrice(for product: Product) -> Double {
         guard let id = product.id else { return 0 }
-        
         let quantity = quantities[id] ?? 1
-        let discount = discounts[id] ?? 0
-        let unitPrice = product.listPrice * (1 - discount / 100)
-        
-        return unitPrice * quantity
+        return product.partnerPrice * quantity
     }
     
-    private func calculateGrandTotal() -> Double {
+    // Calculate extended list price (unit list price * quantity)
+    private func calculateExtendedListPrice(for product: Product) -> Double {
+        guard let id = product.id else { return 0 }
+        let quantity = quantities[id] ?? 1
+        return product.listPrice * quantity
+    }
+    
+    // Calculate extended customer price (extended list price * multiplier)
+    private func calculateExtendedCustomerPrice(for product: Product) -> Double {
+        guard let id = product.id else { return 0 }
+        let extendedListPrice = calculateExtendedListPrice(for: product)
+        let multiplier = multipliers[id] ?? 1.0
+        let discount = discounts[id] ?? 0
+        return extendedListPrice * multiplier * (1 - discount / 100)
+    }
+    
+    // Calculate total profit (extended customer price - extended partner price)
+    private func calculateTotalProfit(for product: Product) -> Double {
+        let extendedCustomerPrice = calculateExtendedCustomerPrice(for: product)
+        let extendedPartnerPrice = calculateExtendedPartnerPrice(for: product)
+        return extendedCustomerPrice - extendedPartnerPrice
+    }
+    
+    // Calculate grand total for customer price
+    private func calculateGrandTotalCustomerPrice() -> Double {
         let selectedProducts = selectedProductsArray()
         return selectedProducts.reduce(0) { total, product in
-            return total + calculateTotal(for: product)
+            return total + calculateExtendedCustomerPrice(for: product)
         }
     }
     
@@ -283,15 +372,21 @@ struct ItemSelectionView: View {
         }
     }
     
+    // COMPLETELY FIXED VERSION - No dynamic property access at all for ProposalItem
     private func addItemsToProposal() {
         for product in selectedProductsArray() {
             guard let productId = product.id else { continue }
             
             let quantity = quantities[productId] ?? 1
             let discount = discounts[productId] ?? 0
-            let unitPrice = product.listPrice * (1 - discount / 100)
-            let total = unitPrice * quantity
             
+            // Calculate the final unit price with discount
+            let unitPrice = product.listPrice * (1 - discount / 100)
+            
+            // Calculate the extended amount
+            let amount = unitPrice * quantity
+            
+            // Create proposal item with ONLY the standard attributes
             let proposalItem = ProposalItem(context: viewContext)
             proposalItem.id = UUID()
             proposalItem.product = product
@@ -299,7 +394,10 @@ struct ItemSelectionView: View {
             proposalItem.quantity = quantity
             proposalItem.unitPrice = unitPrice
             proposalItem.discount = discount
-            proposalItem.amount = total
+            proposalItem.amount = amount
+            
+            // DO NOT use any setValue or value(forKey) methods here
+            // We will use only the properties that already exist in the model
         }
         
         do {
