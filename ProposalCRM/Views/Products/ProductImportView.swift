@@ -1,5 +1,5 @@
 // ProductImportView.swift
-// Simplified and fixed version for reliable CSV import
+// Enhanced version for reliable CSV import with support for large files
 
 import SwiftUI
 import UniformTypeIdentifiers
@@ -21,6 +21,9 @@ struct ProductImportView: View {
     @State private var showDeleteConfirmation = false
     @State private var parsedProducts: [ImportProduct] = []
     @State private var showParsedProducts = false
+    @State private var totalRowsInFile: Int = 0
+    @State private var currentBatchNumber: Int = 0
+    @State private var totalBatches: Int = 0
     
     // Model for imported products
     struct ImportProduct: Identifiable {
@@ -50,7 +53,7 @@ struct ProductImportView: View {
             }
             .navigationTitle("Import Products")
             .sheet(isPresented: $isImporting) {
-                DocumentPicker(csvString: $importedCSVString, errorMessage: $errorMessage)
+                DocumentPicker(csvString: $importedCSVString, errorMessage: $errorMessage, totalRowsInFile: $totalRowsInFile)
                     .onDisappear {
                         if let csvString = importedCSVString {
                             parseCSV(csvString)
@@ -129,8 +132,13 @@ struct ProductImportView: View {
                 .progressViewStyle(LinearProgressViewStyle())
                 .padding()
             
-            Text(status)
-                .font(.headline)
+            if totalBatches > 0 {
+                Text("\(status) - Batch \(currentBatchNumber) of \(totalBatches)")
+                    .font(.headline)
+            } else {
+                Text(status)
+                    .font(.headline)
+            }
             
             // Debug toggle button
             Button(action: { showDebug.toggle() }) {
@@ -160,6 +168,9 @@ struct ProductImportView: View {
                 status = "Ready to import"
                 debugText = ""
                 parsedProducts = []
+                totalRowsInFile = 0
+                currentBatchNumber = 0
+                totalBatches = 0
             }) {
                 Text("Cancel")
                     .foregroundColor(.red)
@@ -173,7 +184,7 @@ struct ProductImportView: View {
         VStack {
             // Preview header
             HStack {
-                Text("Products to Import: \(parsedProducts.count)")
+                Text("Products to Import: \(parsedProducts.count) of \(totalRowsInFile)")
                     .font(.headline)
                 
                 Spacer()
@@ -193,6 +204,7 @@ struct ProductImportView: View {
                     debugText = ""
                     parsedProducts = []
                     showParsedProducts = false
+                    totalRowsInFile = 0
                 }) {
                     Text("Cancel")
                         .foregroundColor(.red)
@@ -492,25 +504,44 @@ struct ProductImportView: View {
                 progress = 0.2
             }
             
-            let chunkSize = 1000
+            // Increased chunk size for better performance with large files
+            let chunkSize = 5000
             let chunks = stride(from: 0, to: lines.count, by: chunkSize).map {
                 Array(lines[$0..<min($0 + chunkSize, lines.count)])
             }
             
-            log("Split into \(chunks.count) chunks of \(chunkSize) lines each")
+            log("Split into \(chunks.count) chunks of up to \(chunkSize) lines each")
             
             var allProducts: [ImportProduct] = []
+            if lines.isEmpty {
+                DispatchQueue.main.async {
+                    errorMessage = "No data found in CSV file"
+                    showError = true
+                    isImportingData = false
+                }
+                return
+            }
+            
             let headerFields = parseLine(lines[0], separator: separator)
             
-            // Map column indices
-            let codeIdx = findColumnIndex(headerFields, possibleNames: ["code", "id", "sku", "product id", "product code"])
-            let nameIdx = findColumnIndex(headerFields, possibleNames: ["name", "product name", "title", "description"])
-            let descIdx = findColumnIndex(headerFields, possibleNames: ["desc", "description", "details", "specs"])
-            let catIdx = findColumnIndex(headerFields, possibleNames: ["category", "type", "group", "cat"])
-            let listPriceIdx = findColumnIndex(headerFields, possibleNames: ["list price", "price", "msrp", "retail"])
-            let partnerPriceIdx = findColumnIndex(headerFields, possibleNames: ["partner price", "cost", "wholesale", "partner"])
+            // Map column indices with more comprehensive guesses
+            let codeIdx = findColumnIndex(headerFields, possibleNames: ["code", "id", "sku", "product id", "product code", "product_id", "item code", "item id", "item_id", "product_code"])
+            let nameIdx = findColumnIndex(headerFields, possibleNames: ["name", "product name", "title", "product_name", "item name", "item_name", "description", "product", "item"])
+            let descIdx = findColumnIndex(headerFields, possibleNames: ["desc", "description", "details", "specs", "specification", "product description", "product_description", "desc.", "long description", "long_description"])
+            let catIdx = findColumnIndex(headerFields, possibleNames: ["category", "type", "group", "cat", "product category", "product_category", "product type", "product_type", "department"])
+            let listPriceIdx = findColumnIndex(headerFields, possibleNames: ["list price", "price", "msrp", "retail", "list_price", "retail price", "selling price", "sell price", "public price", "sales price", "customer price", "price usd"])
+            let partnerPriceIdx = findColumnIndex(headerFields, possibleNames: ["partner price", "cost", "wholesale", "partner", "partner_price", "dealer price", "dealer_price", "wholesale price", "wholesale_price", "buy price", "buying price", "cost price", "supplier price"])
             
             log("Column mapping: code=\(codeIdx), name=\(nameIdx), desc=\(descIdx), cat=\(catIdx), list=\(listPriceIdx), partner=\(partnerPriceIdx)")
+            
+            if codeIdx < 0 || nameIdx < 0 || listPriceIdx < 0 {
+                DispatchQueue.main.async {
+                    errorMessage = "Could not identify required columns. Make sure your CSV has Code, Name, and List Price columns."
+                    showError = true
+                    isImportingData = false
+                }
+                return
+            }
             
             // Process each chunk
             for (i, chunk) in chunks.enumerated() {
@@ -540,6 +571,9 @@ struct ProductImportView: View {
                 progress = 1.0
                 isImportingData = false
                 showParsedProducts = true
+                
+                // Update total rows for reference
+                totalRowsInFile = lines.count - (isLikelyHeader(lines[0]) ? 1 : 0)
             }
         }
     }
@@ -550,20 +584,20 @@ struct ProductImportView: View {
         for line in lines {
             let fields = parseLine(line, separator: separator)
             
-            // Skip rows without enough fields
-            let maxIdx = [codeIdx, nameIdx, descIdx, catIdx, listPriceIdx, partnerPriceIdx].max() ?? 0
-            if fields.count <= maxIdx {
+            // Skip rows without enough fields for required columns
+            let requiredIdx = max(codeIdx, nameIdx, listPriceIdx)
+            if fields.count <= requiredIdx {
                 continue
             }
             
             // Extract fields with safe access
-            let code = (codeIdx >= 0 && codeIdx < fields.count) ? fields[codeIdx] : ""
-            let name = (nameIdx >= 0 && nameIdx < fields.count) ? fields[nameIdx] : ""
-            let description = (descIdx >= 0 && descIdx < fields.count) ? fields[descIdx] : ""
-            let category = (catIdx >= 0 && catIdx < fields.count) ? fields[catIdx] : ""
+            let code = (codeIdx >= 0 && codeIdx < fields.count) ? fields[codeIdx].trimmingCharacters(in: .whitespacesAndNewlines) : ""
+            let name = (nameIdx >= 0 && nameIdx < fields.count) ? fields[nameIdx].trimmingCharacters(in: .whitespacesAndNewlines) : ""
+            let description = (descIdx >= 0 && descIdx < fields.count) ? fields[descIdx].trimmingCharacters(in: .whitespacesAndNewlines) : ""
+            let category = (catIdx >= 0 && catIdx < fields.count) ? fields[catIdx].trimmingCharacters(in: .whitespacesAndNewlines) : ""
             
-            let listPriceStr = (listPriceIdx >= 0 && listPriceIdx < fields.count) ? fields[listPriceIdx] : "0"
-            let partnerPriceStr = (partnerPriceIdx >= 0 && partnerPriceIdx < fields.count) ? fields[partnerPriceIdx] : "0"
+            let listPriceStr = (listPriceIdx >= 0 && listPriceIdx < fields.count) ? fields[listPriceIdx].trimmingCharacters(in: .whitespacesAndNewlines) : "0"
+            let partnerPriceStr = (partnerPriceIdx >= 0 && partnerPriceIdx < fields.count) ? fields[partnerPriceIdx].trimmingCharacters(in: .whitespacesAndNewlines) : "0"
             
             // Parse prices safely
             let listPrice = parsePrice(listPriceStr)
@@ -585,19 +619,30 @@ struct ProductImportView: View {
     }
     
     private func parseLine(_ line: String, separator: String) -> [String] {
+        // More robust CSV parsing that handles quotes correctly
         var fields: [String] = []
         var currentField = ""
         var inQuotes = false
+        var previousChar: Character? = nil
         
         for char in line {
             if char == "\"" {
-                inQuotes = !inQuotes
+                if inQuotes && previousChar == "\"" {
+                    // Double quote inside quotes - add a single quote
+                    currentField += String(char)
+                    previousChar = nil // Reset so we don't handle this twice
+                } else {
+                    // Toggle quote state
+                    inQuotes = !inQuotes
+                }
             } else if String(char) == separator && !inQuotes {
                 fields.append(currentField.trimmingCharacters(in: .whitespacesAndNewlines))
                 currentField = ""
             } else {
                 currentField.append(char)
             }
+            
+            previousChar = char
         }
         
         // Add the last field
@@ -608,7 +653,7 @@ struct ProductImportView: View {
     
     private func findColumnIndex(_ headers: [String], possibleNames: [String]) -> Int {
         // Convert headers to lowercase for case-insensitive matching
-        let lowercaseHeaders = headers.map { $0.lowercased() }
+        let lowercaseHeaders = headers.map { $0.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) }
         
         // First try exact matches
         for name in possibleNames {
@@ -631,7 +676,7 @@ struct ProductImportView: View {
     
     private func isLikelyHeader(_ line: String) -> Bool {
         let lowercased = line.lowercased()
-        let headerTerms = ["product", "code", "name", "description", "price", "category", "id"]
+        let headerTerms = ["product", "code", "name", "description", "price", "category", "id", "sku", "cost", "partner"]
         
         var termCount = 0
         for term in headerTerms {
@@ -646,15 +691,36 @@ struct ProductImportView: View {
     private func parsePrice(_ str: String) -> Double {
         // Remove currency symbols
         var cleaned = str
-        for symbol in ["$", "€", "£", "¥"] {
+        for symbol in ["$", "€", "£", "¥", "₹", "₽", "¢", "₩", "₴", "₦"] {
             cleaned = cleaned.replacingOccurrences(of: symbol, with: "")
         }
         
-        // Remove spaces
+        // Remove spaces and non-breaking spaces
         cleaned = cleaned.replacingOccurrences(of: " ", with: "")
+        cleaned = cleaned.replacingOccurrences(of: "\u{00A0}", with: "")
         
-        // Replace comma with period
+        // Replace comma with period for decimal
         cleaned = cleaned.replacingOccurrences(of: ",", with: ".")
+        
+        // Remove thousands separators (periods in numbers like 1.000.000)
+        let components = cleaned.components(separatedBy: ".")
+        if components.count > 2 {
+            // Has multiple periods - could be thousands separators
+            var result = components[0]
+            for i in 1..<components.count {
+                if i == components.count - 1 {
+                    // Last component is decimal part
+                    result += "." + components[i]
+                } else {
+                    // Intermediate components are thousands separators
+                    result += components[i]
+                }
+            }
+            cleaned = result
+        }
+        
+        // Remove any remaining non-numeric characters except decimal point
+        cleaned = cleaned.trimmingCharacters(in: CharacterSet.decimalDigits.inverted.subtracting(CharacterSet(charactersIn: ".")))
         
         return Double(cleaned) ?? 0.0
     }
@@ -668,11 +734,18 @@ struct ProductImportView: View {
         
         // Use a background context
         let backgroundContext = PersistenceController.shared.container.newBackgroundContext()
+        backgroundContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
         
-        // Process in batches
-        let batchSize = 500
+        // Process in batches - increased batch size for better performance
+        let batchSize = 1000
         let batches = stride(from: 0, to: parsedProducts.count, by: batchSize).map {
             Array(parsedProducts[$0..<min($0 + batchSize, parsedProducts.count)])
+        }
+        
+        log("Split into \(batches.count) batches for saving")
+        
+        DispatchQueue.main.async {
+            totalBatches = batches.count
         }
         
         var savedCount = 0
@@ -696,6 +769,8 @@ struct ProductImportView: View {
                 progress = 0.0
                 status = "Ready to import"
                 showParsedProducts = false
+                totalBatches = 0
+                currentBatchNumber = 0
                 
                 // Dismiss the sheet
                 presentationMode.wrappedValue.dismiss()
@@ -704,65 +779,87 @@ struct ProductImportView: View {
         }
         
         let batch = batches[index]
-        let batchSize = 500 // Define batchSize here
+        let batchSize = 1000 // Define the same batchSize here
         let startIndex = index * batchSize
         
         DispatchQueue.main.async {
             status = "Saving batch \(index+1) of \(batches.count) (\(startIndex+1) to \(startIndex+batch.count))"
             progress = Float(index) / Float(batches.count)
+            currentBatchNumber = index + 1
         }
         
         // Save this batch
         context.perform {
-            for product in batch {
-                // Check if product exists
+            autoreleasepool {
+                // Prepare a dictionary for quick lookup of existing products
+                var existingProductsByCode: [String: Product] = [:]
+                
+                // Collect all product codes in this batch
+                let productCodes = batch.map { $0.code }
+                
+                // Fetch all products with these codes
                 let fetchRequest = NSFetchRequest<Product>(entityName: "Product")
-                fetchRequest.predicate = NSPredicate(format: "code == %@", product.code)
+                fetchRequest.predicate = NSPredicate(format: "code IN %@", productCodes)
                 
                 do {
                     let existingProducts = try context.fetch(fetchRequest)
+                    for product in existingProducts {
+                        if let code = product.code {
+                            existingProductsByCode[code] = product
+                        }
+                    }
                     
-                    if let existingProduct = existingProducts.first {
+                    log("Found \(existingProducts.count) existing products to update")
+                } catch {
+                    log("Error fetching existing products: \(error.localizedDescription)")
+                }
+                
+                // Process batch
+                var updatedCount = 0
+                var createdCount = 0
+                
+                for productData in batch {
+                    if let existingProduct = existingProductsByCode[productData.code] {
                         // Update existing product
-                        existingProduct.setValue(product.name, forKey: "name")
-                        existingProduct.setValue(product.description, forKey: "desc")
-                        existingProduct.setValue(product.category, forKey: "category")
-                        existingProduct.setValue(product.listPrice, forKey: "listPrice")
-                        existingProduct.setValue(product.partnerPrice, forKey: "partnerPrice")
+                        existingProduct.name = productData.name
+                        existingProduct.setValue(productData.description, forKey: "desc")
+                        existingProduct.category = productData.category
+                        existingProduct.listPrice = productData.listPrice
+                        existingProduct.partnerPrice = productData.partnerPrice
+                        updatedCount += 1
                     } else {
                         // Create new product
-                        let newProduct = NSEntityDescription.insertNewObject(forEntityName: "Product", into: context)
-                        newProduct.setValue(UUID(), forKey: "id")
-                        newProduct.setValue(product.code, forKey: "code")
-                        newProduct.setValue(product.name, forKey: "name")
-                        newProduct.setValue(product.description, forKey: "desc")
-                        newProduct.setValue(product.category, forKey: "category")
-                        newProduct.setValue(product.listPrice, forKey: "listPrice")
-                        newProduct.setValue(product.partnerPrice, forKey: "partnerPrice")
+                        let newProduct = NSEntityDescription.insertNewObject(forEntityName: "Product", into: context) as! Product
+                        newProduct.id = UUID()
+                        newProduct.code = productData.code
+                        newProduct.name = productData.name
+                        newProduct.setValue(productData.description, forKey: "desc")
+                        newProduct.category = productData.category
+                        newProduct.listPrice = productData.listPrice
+                        newProduct.partnerPrice = productData.partnerPrice
+                        createdCount += 1
+                    }
+                }
+                
+                // Save the context
+                do {
+                    try context.save()
+                    
+                    // Update count and continue with next batch
+                    let newSavedCount = savedSoFar + batch.count
+                    log("Saved batch \(index+1): Updated \(updatedCount), Created \(createdCount). Total saved so far: \(newSavedCount)")
+                    
+                    // Process next batch with a short delay to allow UI updates
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                        saveBatch(index + 1, batches, context, newSavedCount)
                     }
                 } catch {
-                    log("Error checking for existing product: \(error.localizedDescription)")
-                }
-            }
-            
-            // Save the context
-            do {
-                try context.save()
-                
-                // Update count and continue with next batch
-                let newSavedCount = savedSoFar + batch.count
-                log("Saved batch \(index+1) with \(batch.count) products. Total: \(newSavedCount)")
-                
-                // Process next batch with a delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    saveBatch(index + 1, batches, context, newSavedCount)
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    errorMessage = "Failed to save products: \(error.localizedDescription)"
-                    log("Error saving batch \(index+1): \(error.localizedDescription)")
-                    showError = true
-                    isImportingData = false
+                    DispatchQueue.main.async {
+                        errorMessage = "Failed to save products: \(error.localizedDescription)"
+                        log("Error saving batch \(index+1): \(error.localizedDescription)")
+                        showError = true
+                        isImportingData = false
+                    }
                 }
             }
         }
@@ -770,6 +867,9 @@ struct ProductImportView: View {
     
     private func deleteAllProducts() {
         log("Starting to delete all products...")
+        isImportingData = true
+        status = "Deleting all products..."
+        progress = 0.0
         
         // Use a background context
         let backgroundContext = PersistenceController.shared.container.newBackgroundContext()
@@ -780,47 +880,83 @@ struct ProductImportView: View {
                 let countRequest = NSFetchRequest<Product>(entityName: "Product")
                 let count = try backgroundContext.count(for: countRequest)
                 
+                log("Found \(count) products to delete")
+                
                 // Delete in batches of 1000
                 let batchSize = 1000
                 var deleted = 0
+                var totalBatches = Int(ceil(Double(count) / Double(batchSize)))
+                
+                DispatchQueue.main.async {
+                    self.totalBatches = totalBatches
+                }
                 
                 while deleted < count {
-                    let fetchRequest = NSFetchRequest<Product>(entityName: "Product")
-                    fetchRequest.fetchLimit = batchSize
-                    
-                    let products = try backgroundContext.fetch(fetchRequest)
-                    
-                    for product in products {
-                        backgroundContext.delete(product)
+                    autoreleasepool {
+                        do {  // Add a new do-catch block here
+                            let fetchRequest = NSFetchRequest<NSFetchRequestResult>(entityName: "Product")
+                            fetchRequest.fetchLimit = batchSize
+                            
+                            // Use batch delete request for better performance
+                            let batchDeleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest)
+                            batchDeleteRequest.resultType = .resultTypeObjectIDs
+                            
+                            // HERE'S THE FIX: Add 'try' keyword
+                            let result = try backgroundContext.execute(batchDeleteRequest) as! NSBatchDeleteResult
+                            let objectIDs = result.result as! [NSManagedObjectID]
+                            
+                            // Update the view context with changes
+                            let changes = [NSDeletedObjectsKey: objectIDs]
+                            NSManagedObjectContext.mergeChanges(fromRemoteContextSave: changes, into: [viewContext])
+                            
+                            deleted += objectIDs.count
+                            
+                            DispatchQueue.main.async {
+                                self.progress = Float(deleted) / Float(count)
+                                self.status = "Deleted \(deleted) of \(count) products"
+                                self.currentBatchNumber = Int(ceil(Double(deleted) / Double(batchSize)))
+                                log("Deleted batch - total deleted: \(deleted) of \(count)")
+                            }
+                        } catch {
+                            // Handle any errors during batch deletion
+                            DispatchQueue.main.async {
+                                log("Error during batch deletion: \(error.localizedDescription)")
+                            }
+                        }
                     }
-                    
-                    try backgroundContext.save()
-                    deleted += products.count
                 }
                 
                 DispatchQueue.main.async {
                     log("Successfully deleted \(count) products")
                     errorMessage = "Successfully deleted \(count) products"
                     showError = true
+                    isImportingData = false
+                    totalBatches = 0
+                    currentBatchNumber = 0
                 }
             } catch {
                 DispatchQueue.main.async {
                     log("Error deleting products: \(error.localizedDescription)")
                     errorMessage = "Error deleting products: \(error.localizedDescription)"
                     showError = true
+                    isImportingData = false
                 }
             }
         }
+    
     }
 }
 
-// Document picker for CSV files
+// Document picker for CSV files with optimizations for large files
 struct DocumentPicker: UIViewControllerRepresentable {
     @Binding var csvString: String?
     @Binding var errorMessage: String?
+    @Binding var totalRowsInFile: Int
     
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [UTType.commaSeparatedText, UTType.text])
+        let supportedTypes: [UTType] = [UTType.commaSeparatedText, UTType.text, UTType.plainText, UTType.data]
+        
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: supportedTypes)
         picker.delegate = context.coordinator
         picker.allowsMultipleSelection = false
         return picker
@@ -852,31 +988,145 @@ struct DocumentPicker: UIViewControllerRepresentable {
             
             defer { url.stopAccessingSecurityScopedResource() }
             
+            // Get file size
             do {
-                let data = try Data(contentsOf: url)
+                let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+                let fileSize = attributes[.size] as? Int64 ?? 0
                 
-                // Try UTF-8 first
-                if let string = String(data: data, encoding: .utf8) {
-                    parent.csvString = string
+                // For large files, use a different approach
+                if fileSize > 10_000_000 { // 10MB
+                    // Count lines in the file
+                    if let lineCount = countLinesInFile(at: url) {
+                        parent.totalRowsInFile = lineCount
+                    }
+                    
+                    // Process file in chunks
+                    if let string = readLargeFile(at: url) {
+                        parent.csvString = string
+                    } else {
+                        parent.errorMessage = "Failed to read large file - insufficient memory"
+                    }
                     return
                 }
                 
-                // Try ISO Latin 1
-                if let string = String(data: data, encoding: .isoLatin1) {
-                    parent.csvString = string
-                    return
-                }
-                
-                // Fallback
-                let fallbackString = String(decoding: data, as: UTF8.self)
-                if !fallbackString.isEmpty {
-                    parent.csvString = fallbackString
-                } else {
-                    parent.errorMessage = "Failed to convert file to text - unsupported encoding"
+                // For smaller files, read the entire file at once
+                do {
+                    let data = try Data(contentsOf: url)
+                    
+                    // Count lines
+                    if let string = String(data: data, encoding: .utf8) {
+                        parent.totalRowsInFile = string.components(separatedBy: .newlines).count
+                    }
+                    
+                    // Try UTF-8 first
+                    if let string = String(data: data, encoding: .utf8) {
+                        parent.csvString = string
+                        return
+                    }
+                    
+                    // Try ISO Latin 1
+                    if let string = String(data: data, encoding: .isoLatin1) {
+                        parent.csvString = string
+                        return
+                    }
+                    
+                    // Try Windows CP1252
+                    if let string = String(data: data, encoding: .windowsCP1252) {
+                        parent.csvString = string
+                        return
+                    }
+                    
+                    // Fallback
+                    let fallbackString = String(decoding: data, as: UTF8.self)
+                    if !fallbackString.isEmpty {
+                        parent.csvString = fallbackString
+                    } else {
+                        parent.errorMessage = "Failed to convert file to text - unsupported encoding"
+                    }
+                } catch {
+                    parent.errorMessage = "Failed to read file: \(error.localizedDescription)"
                 }
             } catch {
-                parent.errorMessage = "Failed to read file: \(error.localizedDescription)"
+                parent.errorMessage = "Failed to get file attributes: \(error.localizedDescription)"
             }
+        }
+        
+        // Count lines in a large file
+        private func countLinesInFile(at url: URL) -> Int? {
+            do {
+                let fileHandle = try FileHandle(forReadingFrom: url)
+                defer { fileHandle.closeFile() }
+                
+                var lineCount = 0
+                let chunkSize = 8192 // Read in chunks of 8KB
+                var buffer = Data(capacity: chunkSize)
+                
+                while let chunk = try fileHandle.read(upToCount: chunkSize) {
+                    if chunk.isEmpty { break }
+                    
+                    buffer.append(chunk)
+                    
+                    // Count newlines in buffer
+                    if let string = String(data: buffer, encoding: .utf8) {
+                        lineCount += string.components(separatedBy: .newlines).count - 1
+                        
+                        // Keep only the last line to handle potential partial lines
+                        if let lastNewlineRange = string.range(of: "\n", options: .backwards) {
+                            let lastLine = string[lastNewlineRange.upperBound...]
+                            buffer = Data(lastLine.utf8)
+                        } else {
+                            buffer = Data()
+                        }
+                    }
+                }
+                
+                // Count final line if buffer isn't empty
+                if !buffer.isEmpty {
+                    lineCount += 1
+                }
+                
+                return lineCount
+            } catch {
+                print("Error counting lines: \(error)")
+                return nil
+            }
+        }
+        
+        private func readLargeFile(at url: URL) -> String? {
+            do {
+                // Create a temporary file to store the processed output
+                let tempDirectory = FileManager.default.temporaryDirectory
+                let tempFileURL = tempDirectory.appendingPathComponent(UUID().uuidString)
+                
+                // Create file handle for reading
+                let fileHandle = try FileHandle(forReadingFrom: url)
+                defer { fileHandle.closeFile() }
+                
+                // Create file handle for writing
+                FileManager.default.createFile(atPath: tempFileURL.path, contents: nil)
+                let outputFileHandle = try FileHandle(forWritingTo: tempFileURL)
+                defer {
+                    outputFileHandle.closeFile()
+                    try? FileManager.default.removeItem(at: tempFileURL)
+                }
+                
+                // Process file in chunks
+                let chunkSize = 1_000_000 // 1MB chunks
+                while let chunk = try fileHandle.read(upToCount: chunkSize) {
+                    if chunk.isEmpty { break }
+                    
+                    // Process chunk
+                    outputFileHandle.write(chunk)
+                }
+                
+                // Read the processed file - THIS IS THE FIX: adding "try" here
+                return try String(contentsOf: tempFileURL)
+                
+            } catch {
+                print("Error reading large file: \(error)")
+                return nil
+            }
+        
         }
     }
 }

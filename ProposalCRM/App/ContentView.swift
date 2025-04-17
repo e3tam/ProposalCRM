@@ -16,7 +16,7 @@ struct ContentView: View {
             }
             
             NavigationView {
-                ProductListView()
+                CustomProductListView()
             }
             .tabItem {
                 Label("Products", systemImage: "cube.box")
