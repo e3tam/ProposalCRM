@@ -1,6 +1,3 @@
-// EngineeringView.swift
-// Add engineering services to a proposal
-
 import SwiftUI
 
 struct EngineeringView: View {
@@ -23,11 +20,41 @@ struct EngineeringView: View {
                 Section(header: Text("Engineering Details")) {
                     TextField("Description", text: $description)
                     
-                    Stepper(value: $days, in: 0.5...100, step: 0.5) {
-                        HStack {
-                            Text("Days")
-                            Spacer()
-                            Text("\(days, specifier: "%.1f")")
+                    // Fixed Days control with proper state updates
+                    HStack {
+                        Text("Days")
+                        Spacer()
+                        
+                        // Improve button hit targets and add state update
+                        HStack(spacing: 12) {
+                            Button(action: {
+                                withAnimation {
+                                    if days > 0.5 {
+                                        days -= 0.5
+                                    }
+                                }
+                            }) {
+                                Image(systemName: "minus")
+                                    .frame(width: 32, height: 32)
+                                    .background(Color.gray.opacity(0.2))
+                                    .clipShape(Circle())
+                            }
+                            .buttonStyle(BorderlessButtonStyle()) // Important for nested buttons
+                            
+                            Text(String(format: "%.1f", days))
+                                .frame(minWidth: 40, alignment: .center)
+                            
+                            Button(action: {
+                                withAnimation {
+                                    days += 0.5
+                                }
+                            }) {
+                                Image(systemName: "plus")
+                                    .frame(width: 32, height: 32)
+                                    .background(Color.gray.opacity(0.2))
+                                    .clipShape(Circle())
+                            }
+                            .buttonStyle(BorderlessButtonStyle()) // Important for nested buttons
                         }
                     }
                     
@@ -61,7 +88,7 @@ struct EngineeringView: View {
                     Button("Add") {
                         addEngineering()
                     }
-                    .disabled(description.isEmpty)
+                    .disabled(days <= 0 || rate <= 0)
                 }
             }
         }
@@ -78,10 +105,7 @@ struct EngineeringView: View {
         
         do {
             try viewContext.save()
-            
-            // Update proposal total
             updateProposalTotal()
-            
             presentationMode.wrappedValue.dismiss()
         } catch {
             let nsError = error as NSError
@@ -90,7 +114,6 @@ struct EngineeringView: View {
     }
     
     private func updateProposalTotal() {
-        // Calculate total amount
         let productsTotal = proposal.subtotalProducts
         let engineeringTotal = proposal.subtotalEngineering
         let expensesTotal = proposal.subtotalExpenses

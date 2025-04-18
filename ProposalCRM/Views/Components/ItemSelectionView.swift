@@ -1,5 +1,6 @@
+
 // ItemSelectionView.swift
-// Select products to add to a proposal with enhanced calculations
+// Select products to add to a proposal with enhanced calculations and search functionality
 
 import SwiftUI
 import CoreData
@@ -32,6 +33,17 @@ struct ItemSelectionView: View {
     var body: some View {
         NavigationView {
             VStack {
+                // Search bar - New addition
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.secondary)
+                    
+                    TextField("Search Products", text: $searchText)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                }
+                .padding(.horizontal)
+                .padding(.top, 10)
+                
                 // Category filter
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack {
@@ -72,35 +84,67 @@ struct ItemSelectionView: View {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(product.formattedName)
                                             .font(.headline)
+                                            .lineLimit(1)
+                                        
+                                        // Show product description if available
+                                        if let description = product.desc, !description.isEmpty {
+                                            Text(description)
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                                .lineLimit(1)
+                                        }
                                         
                                         HStack {
                                             Text(product.formattedCode)
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
+                                                .padding(3)
+                                                .background(Color.gray.opacity(0.1))
+                                                .cornerRadius(4)
                                             
                                             Spacer()
                                             
                                             Text(String(format: "%.2f", product.listPrice))
                                                 .font(.subheadline)
                                                 .foregroundColor(.blue)
+                                                .fontWeight(.semibold)
                                         }
                                     }
                                 }
                             }
                             .buttonStyle(PlainButtonStyle())
                             
-                            if isSelected(product) {
-                                Stepper(
-                                    value: Binding(
-                                        get: { self.quantities[product.id!] ?? 1 },
-                                        set: { self.quantities[product.id!] = $0 }
-                                    ),
-                                    in: 1...100
-                                ) {
-                                    Text("\(Int(quantities[product.id!] ?? 1))")
-                                        .frame(minWidth: 30)
+                                                                        if isSelected(product) {
+                                HStack {
+                                    Text("Qty:")
+                                        .foregroundColor(.secondary)
+                                        
+                                    // Number input field for quantity
+                                    TextField("1",
+                                        text: Binding(
+                                            get: { String(format: "%d", Int(self.quantities[product.id!] ?? 1)) },
+                                            set: { if let value = Double($0), value >= 1 && value <= 100 {
+                                                self.quantities[product.id!] = value
+                                            }}
+                                        )
+                                    )
+                                    .keyboardType(.numberPad)
+                                    .multilineTextAlignment(.center)
+                                    .frame(width: 50)
+                                    .padding(4)
+                                    .background(Color(UIColor.secondarySystemBackground))
+                                    .cornerRadius(8)
+                                    
+                                    // Keep the stepper for easy adjustment
+                                    Stepper("",
+                                        value: Binding(
+                                            get: { self.quantities[product.id!] ?? 1 },
+                                            set: { self.quantities[product.id!] = $0 }
+                                        ),
+                                        in: 1...100
+                                    )
                                 }
-                                .frame(width: 120)
+                                .frame(width: 150)
                             }
                         }
                     }
@@ -119,13 +163,51 @@ struct ItemSelectionView: View {
                             VStack(spacing: 12) {
                                 ForEach(selectedProductsArray(), id: \.self) { product in
                                     VStack {
-                                        HStack {
+                                        // Enhanced product name and description display
+                                        VStack(alignment: .leading, spacing: 4) {
                                             Text(product.formattedName)
                                                 .font(.headline)
+                                                .fontWeight(.bold)
+                                            
+                                            if let description = product.desc, !description.isEmpty {
+                                                Text(description)
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.secondary)
+                                                    .lineLimit(2)
+                                                    .padding(.bottom, 2)
+                                            }
+                                        }
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        
+                                        HStack {
+                                            Text("Qty:")
+                                                .font(.body)
+                                                .foregroundColor(.secondary)
+                                            
+                                            // Number entry for quantity
+                                            TextField("1",
+                                                text: Binding(
+                                                    get: { String(format: "%d", Int(self.quantities[product.id!] ?? 1)) },
+                                                    set: { if let value = Double($0), value >= 1 && value <= 100 {
+                                                        self.quantities[product.id!] = value
+                                                    }}
+                                                )
+                                            )
+                                            .keyboardType(.numberPad)
+                                            .multilineTextAlignment(.center)
+                                            .frame(width: 50)
+                                            .padding(4)
+                                            .background(Color(UIColor.secondarySystemBackground))
+                                            .cornerRadius(8)
                                             
                                             Spacer()
                                             
-                                            Text("Qty: \(Int(quantities[product.id!] ?? 1))")
+                                            Text(product.formattedCode)
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                                .padding(3)
+                                                .background(Color.gray.opacity(0.1))
+                                                .cornerRadius(4)
                                         }
                                         
                                         HStack {
@@ -144,30 +226,48 @@ struct ItemSelectionView: View {
                                                 .frame(width: 50, alignment: .trailing)
                                         }
                                         
-                                        // New multiplier field
+                                        // Multiplier as number entry box instead of slider
                                         HStack {
                                             Text("Multiplier:")
                                             
-                                            Slider(
-                                                value: Binding(
-                                                    get: { self.multipliers[product.id!] ?? 1.0 },
-                                                    set: { self.multipliers[product.id!] = $0 }
-                                                ),
-                                                in: 0.5...2,
-                                                step: 0.05
-                                            )
+                                            Spacer()
                                             
-                                            Text("\(String(format: "%.2f", multipliers[product.id!] ?? 1.0))x")
-                                                .frame(width: 50, alignment: .trailing)
+                                            // Number entry box for multiplier
+                                            HStack {
+                                                TextField("1.00",
+                                                    text: Binding(
+                                                        get: { String(format: "%.2f", self.multipliers[product.id!] ?? 1.0) },
+                                                        set: { if let value = Double($0), value >= 0.5 && value <= 2.0 {
+                                                            self.multipliers[product.id!] = value
+                                                        }}
+                                                    )
+                                                )
+                                                .keyboardType(.decimalPad)
+                                                .multilineTextAlignment(.trailing)
+                                                .frame(width: 80)
+                                                .padding(6)
+                                                .background(Color(UIColor.secondarySystemBackground))
+                                                .cornerRadius(8)
+                                                
+                                                Text("x")
+                                                    .foregroundColor(.secondary)
+                                            }
                                         }
                                         
-                                        // New custom description field
-                                        TextField("Custom Description", text: Binding(
-                                            get: { self.customDescriptions[product.id!] ?? "" },
-                                            set: { self.customDescriptions[product.id!] = $0 }
-                                        ))
-                                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                                        .padding(.vertical, 4)
+                                        // Custom description field
+                                        VStack(alignment: .leading) {
+                                            Text("Custom Description:")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                            
+                                            TextField("Enter custom description", text: Binding(
+                                                get: { self.customDescriptions[product.id!] ?? "" },
+                                                set: { self.customDescriptions[product.id!] = $0 }
+                                            ))
+                                            .padding(8)
+                                            .background(Color(UIColor.secondarySystemBackground))
+                                            .cornerRadius(8)
+                                        }
                                         
                                         // New custom tax checkbox
                                         Toggle("Apply Custom Tax", isOn: Binding(
@@ -251,7 +351,6 @@ struct ItemSelectionView: View {
                     .background(Color(UIColor.secondarySystemBackground))
                 }
             }
-            .searchable(text: $searchText, prompt: "Search Products")
             .navigationTitle("Select Products")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
