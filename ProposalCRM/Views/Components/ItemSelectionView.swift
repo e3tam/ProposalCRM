@@ -495,8 +495,13 @@ struct ItemSelectionView: View {
             proposalItem.discount = discount
             proposalItem.amount = amount
             
-            // DO NOT use any setValue or value(forKey) methods here
-            // We will use only the properties that already exist in the model
+            // Log the activity of adding a product
+            ActivityLogger.logItemAdded(
+                proposal: proposal,
+                context: viewContext,
+                itemType: "Product",
+                itemName: product.name ?? "Unknown"
+            )
         }
         
         do {

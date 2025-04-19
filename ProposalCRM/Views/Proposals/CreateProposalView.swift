@@ -78,6 +78,12 @@ struct CreateProposalView: View {
         do {
             try viewContext.save()
             proposal = newProposal
+            
+            // Log proposal creation
+            ActivityLogger.logProposalCreated(
+                proposal: newProposal,
+                context: viewContext
+            )
         } catch {
             let nsError = error as NSError
             print("Error creating proposal: \(nsError), \(nsError.userInfo)")

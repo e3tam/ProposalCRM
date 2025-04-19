@@ -69,6 +69,9 @@ struct EditProposalView: View {
     }
     
     private func saveProposal() {
+        // Track if status changed
+        let oldStatus = proposal.status ?? ""
+        
         proposal.number = proposalNumber
         proposal.status = status
         proposal.creationDate = creationDate
@@ -76,6 +79,23 @@ struct EditProposalView: View {
         
         do {
             try viewContext.save()
+            
+            // Log status change if applicable
+            if oldStatus != status {
+                ActivityLogger.logStatusChanged(
+                    proposal: proposal,
+                    context: viewContext,
+                    oldStatus: oldStatus,
+                    newStatus: status
+                )
+            } else {
+                ActivityLogger.logProposalUpdated(
+                    proposal: proposal,
+                    context: viewContext,
+                    fieldChanged: "proposal details"
+                )
+            }
+            
             presentationMode.wrappedValue.dismiss()
         } catch {
             let nsError = error as NSError

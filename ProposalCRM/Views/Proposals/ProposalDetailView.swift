@@ -30,8 +30,9 @@ struct ProposalDetailView: View {
     // State variables for deletion confirmation
     @State private var showDeleteConfirmation = false
     @State private var itemToDelete: ProposalItem?
-    
-    // State variables for product item editing
+    @State private var showingAddTask = false
+    @State private var showingAddComment = false
+    @State private var commentText = ""    // State variables for product item editing
     @State private var itemToEdit: ProposalItem?
     @State private var showEditItemSheet = false
     @State private var didSaveItemChanges = false  // Track if changes were saved
@@ -878,8 +879,29 @@ struct ProposalDetailView: View {
         }
         .padding(.horizontal)
     }
+    TaskSummaryView(proposal: proposal)
+
+    ActivitySummaryView(proposal: proposal)    // Helper view for consistent financial summary rows
     
-    // Helper view for consistent financial summary rows
+    
+    private func logStatusChange(oldStatus: String, newStatus: String) {
+        ActivityLogger.logStatusChanged(
+            proposal: proposal,
+            context: viewContext,
+            oldStatus: oldStatus,
+            newStatus: newStatus
+        )
+    }
+
+    // Function to log proposal edits
+    private func logProposalEdit(fieldChanged: String) {
+        ActivityLogger.logProposalUpdated(
+            proposal: proposal,
+            context: viewContext,
+            fieldChanged: fieldChanged
+        )
+    }
+
     private struct SummaryRow: View {
         let title: String
         let value: Double
@@ -919,8 +941,7 @@ struct ProposalDetailView: View {
         }
         .padding(.horizontal)
     }
-    
-    // MARK: - Helper Functions
+ 
     
     private func statusColor(for status: String) -> Color {
         switch status {
@@ -952,6 +973,16 @@ struct ProposalDetailView: View {
     
     private func deleteItem(_ item: ProposalItem) {
         withAnimation {
+            // Log activity before deleting
+            if let product = item.product {
+                ActivityLogger.logItemRemoved(
+                    proposal: proposal,
+                    context: viewContext,
+                    itemType: "Product",
+                    itemName: product.name ?? "Unknown"
+                )
+            }
+            
             viewContext.delete(item)
             
             do {

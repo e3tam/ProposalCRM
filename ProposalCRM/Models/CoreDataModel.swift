@@ -206,3 +206,115 @@ extension CustomTax {
         return String(format: "%.2f", amount)
     }
 }
+extension Task {
+    var formattedDueDate: String {
+        guard let date = dueDate else {
+            return "No due date"
+        }
+        
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: date)
+    }
+    
+    var priorityColor: Color {
+        switch priority {
+        case "High": return .red
+        case "Medium": return .orange
+        case "Low": return .blue
+        default: return .gray
+        }
+    }
+    
+    var statusColor: Color {
+        switch status {
+        case "New": return .blue
+        case "In Progress": return .orange
+        case "Completed": return .green
+        case "Deferred": return .gray
+        default: return .gray
+        }
+    }
+    
+    var isOverdue: Bool {
+        guard let dueDate = dueDate else { return false }
+        return dueDate < Date() && status != "Completed"
+    }
+}
+
+extension Activity {
+    var formattedTimestamp: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
+        return formatter.string(from: timestamp ?? Date())
+    }
+    
+    var typeIcon: String {
+        switch type {
+        case "Created": return "plus.circle"
+        case "Updated": return "pencil.circle"
+        case "StatusChanged": return "arrow.triangle.swap"
+        case "CommentAdded": return "text.bubble"
+        case "TaskAdded": return "checkmark.circle"
+        case "TaskCompleted": return "checkmark.circle.fill"
+        case "DocumentAdded": return "doc.fill"
+        default: return "circle"
+        }
+    }
+    
+    var typeColor: Color {
+        switch type {
+        case "Created": return .green
+        case "Updated": return .blue
+        case "StatusChanged": return .orange
+        case "CommentAdded": return .purple
+        case "TaskAdded": return .blue
+        case "TaskCompleted": return .green
+        case "DocumentAdded": return .gray
+        default: return .gray
+        }
+    }
+}
+
+// Add to Proposal extension in CoreDataModel.swift
+
+extension Proposal {
+    var tasksArray: [Task] {
+        let set = tasks as? Set<Task> ?? []
+        return set.sorted {
+            if $0.status == "Completed" && $1.status != "Completed" {
+                return false
+            } else if $0.status != "Completed" && $1.status == "Completed" {
+                return true
+            } else if let date0 = $0.dueDate, let date1 = $1.dueDate {
+                return date0 < date1
+            } else if $0.dueDate != nil && $1.dueDate == nil {
+                return true
+            } else if $0.dueDate == nil && $1.dueDate != nil {
+                return false
+            } else {
+                return $0.creationDate ?? Date() > $1.creationDate ?? Date()
+            }
+        }
+    }
+    
+    var activitiesArray: [Activity] {
+        let set = activities as? Set<Activity> ?? []
+        return set.sorted {
+            $0.timestamp ?? Date() > $1.timestamp ?? Date()
+        }
+    }
+    
+    var pendingTasksCount: Int {
+        return tasksArray.filter { $0.status != "Completed" }.count
+    }
+    
+    var hasOverdueTasks: Bool {
+        return tasksArray.contains { $0.isOverdue }
+    }
+    
+    var lastActivity: Activity? {
+        return activitiesArray.first
+    }
+}
