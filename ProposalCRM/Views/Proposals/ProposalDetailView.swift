@@ -10,8 +10,6 @@
 //  ProposalDetailView.swift
 //  ProposalCRM
 //
-//  Created by Ali Sami Gözükırmızı on 19.04.2025.
-//
 
 import SwiftUI
 import CoreData
@@ -256,8 +254,8 @@ struct ProposalDetailView: View {
                                                             
                                                             Divider().frame(height: 40)
                                                             
-                                                            // Multiplier (default to 1.00)
-                                                            Text("1.00")
+                                                            // Multiplier (calculated from price data)
+                                                            Text(String(format: "%.2f", calculateMultiplier(item)))
                                                                 .font(.system(size: 14))
                                                                 .frame(width: 80, alignment: .center)
                                                                 .padding(.horizontal, 5)
@@ -776,6 +774,17 @@ struct ProposalDetailView: View {
         } message: {
             Text("Are you sure you want to delete this item from the proposal?")
         }
+    }
+    
+    // MARK: - Helper method to calculate multiplier value
+    private func calculateMultiplier(_ item: ProposalItem) -> Double {
+        if let product = item.product, product.listPrice > 0 {
+            let discountFactor = 1.0 - (item.discount / 100.0)
+            if discountFactor > 0 {
+                return item.unitPrice / (product.listPrice * discountFactor)
+            }
+        }
+        return 1.0 // Default value
     }
     
     // MARK: - Financial Summary Section

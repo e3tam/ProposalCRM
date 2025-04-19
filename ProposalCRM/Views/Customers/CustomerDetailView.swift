@@ -46,7 +46,8 @@ struct CustomerDetailView: View {
                 .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
                 
                 // Proposals Section
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 10)
+                {
                     HStack {
                         Text("Proposals")
                             .font(.title2)

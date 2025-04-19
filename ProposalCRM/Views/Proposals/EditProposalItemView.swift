@@ -6,8 +6,10 @@
 //
 
 
-// Fixed EditProposalItemView.swift
-// Corrected implementation without userInfo errors
+//
+//  EditProposalItemView.swift
+//  ProposalCRM
+//
 
 import SwiftUI
 import CoreData
@@ -45,7 +47,20 @@ struct EditProposalItemView: View {
         _discount = State(initialValue: item.discount)
         _unitPrice = State(initialValue: item.unitPrice)
         _listPrice = State(initialValue: item.product?.listPrice ?? 0)
-        _multiplier = State(initialValue: 1.0) // Default multiplier
+        
+        // Calculate the multiplier from existing data
+        let calculatedMultiplier: Double
+        if let product = item.product, product.listPrice > 0 {
+            let discountFactor = 1.0 - (item.discount / 100.0)
+            if discountFactor > 0 {
+                calculatedMultiplier = item.unitPrice / (product.listPrice * discountFactor)
+            } else {
+                calculatedMultiplier = 1.0
+            }
+        } else {
+            calculatedMultiplier = 1.0
+        }
+        _multiplier = State(initialValue: calculatedMultiplier)
     }
     
     // Calculated values
@@ -302,8 +317,7 @@ struct EditProposalItemView: View {
         // Calculate and set the final amount
         item.amount = amount
         
-        // Note: We don't save customName since there's no proper field for it
-        // We also don't directly save multiplier as it's not a property in the model
+        // DO NOT try to set multiplier directly - it's not in the Core Data model
         
         do {
             try viewContext.save()
