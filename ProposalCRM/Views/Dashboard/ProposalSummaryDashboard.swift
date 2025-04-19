@@ -29,8 +29,6 @@ struct ProposalSummaryDashboard: View {
                 
                 NavigationLink(destination: ProposalListView()) {
                     Text("View All")
-                        .font(.subheadline)
-                        .foregroundColor(.blue)
                 }
             }
             

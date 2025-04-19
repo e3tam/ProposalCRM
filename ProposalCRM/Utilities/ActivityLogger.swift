@@ -28,8 +28,8 @@ class ActivityLogger {
             activity.id = UUID()
             activity.timestamp = Date()
             activity.type = type
-            activity.description = description
-            activity.userPerformed = userPerformed
+            activity.desc = description
+           
             activity.details = details
             activity.proposal = proposal
             

@@ -6,10 +6,7 @@
 //
 
 
-//
-// GlobalActivityView.swift
-// System-wide activity feed view
-//
+// Complete fixed version of the filteredActivities property in GlobalActivityView.swift
 
 import SwiftUI
 
@@ -108,8 +105,10 @@ struct GlobalActivityView: View {
         .navigationTitle("Activity History")
     }
     
+    // FIXED: Properly handle filtering of FetchedResults
     private var filteredActivities: [Activity] {
-        var result = activities
+        // Start by converting FetchedResults to an Array
+        var result = Array(activities)
         
         // Apply type filter if selected
         if let type = selectedActivityType {
@@ -119,16 +118,23 @@ struct GlobalActivityView: View {
         // Apply search filter if entered
         if !searchText.isEmpty {
             result = result.filter { activity in
-                let descMatch = activity.description?.localizedCaseInsensitiveContains(searchText) ?? false
+                // Check description match (safely handle optionals)
+                let descMatch = (activity.desc?.localizedCaseInsensitiveContains(searchText)) ?? false
+                
+                // Check type match
                 let typeMatch = activity.type?.localizedCaseInsensitiveContains(searchText) ?? false
+                
+                // Check proposal match
                 let proposalMatch = activity.proposal?.number?.localizedCaseInsensitiveContains(searchText) ?? false
+                
+                // Check details match
                 let detailsMatch = activity.details?.localizedCaseInsensitiveContains(searchText) ?? false
                 
                 return descMatch || typeMatch || proposalMatch || detailsMatch
             }
         }
         
-        return Array(result)
+        return result
     }
     
     private func formatActivityType(_ type: String) -> String {

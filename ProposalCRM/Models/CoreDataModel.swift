@@ -3,40 +3,7 @@
 
 import Foundation
 import CoreData
-
-// Core Data Model Manager
-// COMMENTED OUT TO AVOID DUPLICATION WITH Persistence.swift
-/*
-// COMMENTED OUT TO AVOID DUPLICATION WITH Persistence.swift
-/*
-class PersistenceController {
-    static let shared = PersistenceController()
-    
-    let container: NSPersistentContainer
-    
-    init(inMemory: Bool = false) {
-        container = NSPersistentContainer(name: "ProposalCRM")
-        
-        if inMemory {
-            container.persistentStoreDescriptions.first!.url = URL(fileURLWithPath: "/dev/null")
-        }
-        
-        container.loadPersistentStores { (storeDescription, error) in
-            if let error = error as NSError? {
-                fatalError("Unresolved error \(error), \(error.userInfo)")
-            }
-        }
-        
-        container.viewContext.automaticallyMergesChangesFromParent = true
-        container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
-    }
-}
-
-// Extension for creating sample data for preview
-*/
-
-*/
-
+import SwiftUI // Added SwiftUI import for Color
 
 // MARK: - CoreData entity extensions
 
@@ -71,6 +38,9 @@ extension Product {
 
 // Proposal extension
 extension Proposal {
+    
+  
+
     var formattedNumber: String {
         return number ?? "New Proposal"
     }
@@ -107,14 +77,14 @@ extension Proposal {
     var engineeringArray: [Engineering] {
         let set = engineering as? Set<Engineering> ?? []
         return set.sorted {
-            $0.description ?? "" < $1.description ?? ""
+            $0.desc ?? "" < $1.desc ?? ""
         }
     }
     
     var expensesArray: [Expense] {
         let set = expenses as? Set<Expense> ?? []
         return set.sorted {
-            $0.description ?? "" < $1.description ?? ""
+            $0.desc ?? "" < $1.desc ?? ""
         }
     }
     
@@ -122,6 +92,45 @@ extension Proposal {
         let set = taxes as? Set<CustomTax> ?? []
         return set.sorted {
             $0.name ?? "" < $1.name ?? ""
+        }
+    }
+
+        // Added relationship accessors for tasks and activities
+    var tasksArray: [Task] {
+            let fetchRequest: NSFetchRequest<Task> = Task.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "proposal.id == %@", self.id! as CVarArg)
+            
+            do {
+                let context = PersistenceController.shared.container.viewContext
+                let fetchedTasks = try context.fetch(fetchRequest)
+                
+                // Sort the tasks
+                return fetchedTasks.sorted { task1, task2 in
+                    if task1.status == "Completed" && task2.status != "Completed" {
+                        return false
+                    } else if task1.status != "Completed" && task2.status == "Completed" {
+                        return true
+                    } else if let date1 = task1.dueDate, let date2 = task2.dueDate {
+                        return date1 < date2
+                    } else if task1.dueDate != nil && task2.dueDate == nil {
+                        return true
+                    } else if task1.dueDate == nil && task2.dueDate != nil {
+                        return false
+                    } else {
+                        return task1.creationDate ?? Date() > task2.creationDate ?? Date()
+                    }
+                }
+            } catch {
+                print("ERROR: Failed to fetch tasks for proposal: \(error)")
+                return []
+            }
+        }
+    
+    
+    var activitiesArray: [Activity] {
+        let set = activities as? Set<Activity> ?? []
+        return set.sorted {
+            $0.timestamp ?? Date() > $1.timestamp ?? Date()
         }
     }
     
@@ -165,6 +174,18 @@ extension Proposal {
         }
         return (grossProfit / totalAmount) * 100
     }
+    
+    var pendingTasksCount: Int {
+        return tasksArray.filter { $0.status != "Completed" }.count
+    }
+    
+    var hasOverdueTasks: Bool {
+        return tasksArray.contains { $0.isOverdue }
+    }
+    
+    var lastActivity: Activity? {
+        return activitiesArray.first
+    }
 }
 
 // ProposalItem extension
@@ -206,7 +227,15 @@ extension CustomTax {
         return String(format: "%.2f", amount)
     }
 }
+
+// Task extension
 extension Task {
+    
+    @objc dynamic var proposalObj: Proposal? {
+        get { return proposal }
+        set { proposal = newValue }
+    }
+
     var formattedDueDate: String {
         guard let date = dueDate else {
             return "No due date"
@@ -242,6 +271,7 @@ extension Task {
     }
 }
 
+// Activity extension
 extension Activity {
     var formattedTimestamp: String {
         let formatter = DateFormatter()
@@ -274,47 +304,5 @@ extension Activity {
         case "DocumentAdded": return .gray
         default: return .gray
         }
-    }
-}
-
-// Add to Proposal extension in CoreDataModel.swift
-
-extension Proposal {
-    var tasksArray: [Task] {
-        let set = tasks as? Set<Task> ?? []
-        return set.sorted {
-            if $0.status == "Completed" && $1.status != "Completed" {
-                return false
-            } else if $0.status != "Completed" && $1.status == "Completed" {
-                return true
-            } else if let date0 = $0.dueDate, let date1 = $1.dueDate {
-                return date0 < date1
-            } else if $0.dueDate != nil && $1.dueDate == nil {
-                return true
-            } else if $0.dueDate == nil && $1.dueDate != nil {
-                return false
-            } else {
-                return $0.creationDate ?? Date() > $1.creationDate ?? Date()
-            }
-        }
-    }
-    
-    var activitiesArray: [Activity] {
-        let set = activities as? Set<Activity> ?? []
-        return set.sorted {
-            $0.timestamp ?? Date() > $1.timestamp ?? Date()
-        }
-    }
-    
-    var pendingTasksCount: Int {
-        return tasksArray.filter { $0.status != "Completed" }.count
-    }
-    
-    var hasOverdueTasks: Bool {
-        return tasksArray.contains { $0.isOverdue }
-    }
-    
-    var lastActivity: Activity? {
-        return activitiesArray.first
     }
 }

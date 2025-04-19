@@ -30,9 +30,12 @@ struct ProposalDetailView: View {
     // State variables for deletion confirmation
     @State private var showDeleteConfirmation = false
     @State private var itemToDelete: ProposalItem?
+    
+    // Task and activity state variables
     @State private var showingAddTask = false
     @State private var showingAddComment = false
-    @State private var commentText = ""    // State variables for product item editing
+    @State private var commentText = ""    
+    @State private var taskListRefreshTrigger = UUID()    // State variables for product item editing
     @State private var itemToEdit: ProposalItem?
     @State private var showEditItemSheet = false
     @State private var didSaveItemChanges = false  // Track if changes were saved
@@ -66,7 +69,7 @@ struct ProposalDetailView: View {
                     
                     // Content sections with proper spacing
                     VStack(alignment: .leading, spacing: 20) {
-                        // UPDATED Products Section with enhanced table
+                        // PRODUCTS SECTION
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
                                 Text("Products")
@@ -349,7 +352,7 @@ struct ProposalDetailView: View {
                         }
                         .padding(.horizontal)
                         
-                        // Engineering Section - fixed rendering
+                        // ENGINEERING SECTION
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
                                 Text("Engineering")
@@ -469,7 +472,7 @@ struct ProposalDetailView: View {
                         }
                         .padding(.horizontal)
                         
-                        // Expenses Section - fixed rendering
+                        // EXPENSES SECTION
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
                                 Text("Expenses")
@@ -571,7 +574,7 @@ struct ProposalDetailView: View {
                         }
                         .padding(.horizontal)
                         
-                        // Custom Taxes Section - fixed rendering
+                        // CUSTOM TAXES SECTION
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
                                 Text("Custom Taxes")
@@ -676,10 +679,16 @@ struct ProposalDetailView: View {
                         }
                         .padding(.horizontal)
                         
-                        // Financial Summary
+                        // FINANCIAL SUMMARY SECTION
                         financialSummarySection
                         
-                        // Notes Section
+                        // TASK SECTION - IMPORTANT NEW ADDITION
+                        taskSummarySection
+                        
+                        // ACTIVITY SECTION - IMPORTANT NEW ADDITION
+                        activitySummarySection
+                        
+                        // NOTES SECTION
                         if let notes = proposal.notes, !notes.isEmpty {
                             notesSection(notes: notes)
                         }
@@ -765,6 +774,37 @@ struct ProposalDetailView: View {
                     }
             }
         }
+        // TASK PRESENTATION SHEET
+        .sheet(isPresented: $showingAddTask, onDismiss: {
+            print("DEBUG: Add Task sheet dismissed")
+            
+            // Force refresh the task list
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                print("DEBUG: Refreshing task list after sheet dismissal")
+                self.taskListRefreshTrigger = UUID()
+                
+                // For very stubborn cases, try explicitly refreshing the Core Data fetch
+                let context = PersistenceController.shared.container.viewContext
+                context.refreshAllObjects()
+            }
+        }) {
+            AddTaskView(proposal: proposal)
+                .environment(\.managedObjectContext, viewContext)
+        }
+        // COMMENT ALERT
+        .alert("Add Comment", isPresented: $showingAddComment) {
+            TextField("Comment", text: $commentText)
+            
+            Button("Cancel", role: .cancel) { }
+            Button("Save") {
+                if !commentText.isEmpty {
+                    addComment()
+                }
+            }
+        } message: {
+            Text("Enter a comment for this proposal")
+        }
+        // DELETE CONFIRMATION
         .alert("Delete Item?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 if let item = itemToDelete {
@@ -777,19 +817,242 @@ struct ProposalDetailView: View {
         }
     }
     
-    // MARK: - Helper method to calculate multiplier value
-    private func calculateMultiplier(_ item: ProposalItem) -> Double {
-        if let product = item.product, product.listPrice > 0 {
-            let discountFactor = 1.0 - (item.discount / 100.0)
-            if discountFactor > 0 {
-                return item.unitPrice / (product.listPrice * discountFactor)
+    // MARK: - Task Summary Section
+    private var taskSummarySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // This forces view refresh when tasks change
+            let _ = taskListRefreshTrigger
+            
+            HStack {
+                Text("Tasks")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                
+                if proposal.tasksArray.count > 0 {
+                    Text("(\(proposal.tasksArray.count))")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                }
+                
+                Spacer()
+                
+                Button(action: {
+                    print("DEBUG: Add Task button tapped")
+                    showingAddTask = true
+                }) {
+                    Label("Add", systemImage: "plus")
+                        .foregroundColor(.blue)
+                }
+            }
+            
+            // For debugging, add this temporarily
+            Text("DEBUG: Task count: \(proposal.tasksArray.count)")
+                .font(.caption)
+                .foregroundColor(.yellow)
+                .padding(4)
+                .background(Color.black)
+                .cornerRadius(4)
+            
+            if proposal.tasksArray.isEmpty {
+                Text("No tasks created yet")
+                    .foregroundColor(.gray)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.black.opacity(0.2))
+                    .cornerRadius(10)
+            } else {
+                ZStack {
+                    // Solid background
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.black.opacity(0.2))
+                    
+                    VStack(spacing: 0) {
+                        // Task list
+                        ForEach(proposal.tasksArray.prefix(5), id: \.self) { task in
+                            NavigationLink(destination: TaskDetailView(task: task)) {
+                                HStack {
+                                    Circle()
+                                        .fill(task.statusColor)
+                                        .frame(width: 12, height: 12)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(task.title ?? "")
+                                            .font(.subheadline)
+                                            .foregroundColor(.white)
+                                            .strikethrough(task.status == "Completed")
+                                        
+                                        HStack {
+                                            Circle()
+                                                .fill(task.priorityColor)
+                                                .frame(width: 8, height: 8)
+                                            
+                                            Text(task.priority ?? "")
+                                                .font(.caption)
+                                                .foregroundColor(.gray)
+                                            
+                                            if let dueDate = task.dueDate {
+                                                Text("•")
+                                                    .foregroundColor(.gray)
+                                                
+                                                Text(dueDate, style: .date)
+                                                    .font(.caption)
+                                                    .foregroundColor(task.isOverdue ? .red : .gray)
+                                            }
+                                            
+                                            if task.isOverdue {
+                                                Text("OVERDUE")
+                                                    .font(.caption)
+                                                    .padding(2)
+                                                    .background(Color.red)
+                                                    .foregroundColor(.white)
+                                                    .cornerRadius(4)
+                                            }
+                                        }
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .foregroundColor(.gray)
+                                        .font(.caption)
+                                }
+                                .padding(.vertical, 8)
+                                .padding(.horizontal)
+                                .background(Color.black.opacity(0.1))
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            Divider()
+                                .background(Color.gray.opacity(0.3))
+                        }
+                        
+                        // Show more button if needed
+                        if proposal.tasksArray.count > 5 {
+                            NavigationLink(destination: TaskListViewForProposal(proposal: proposal)) {
+                                Text("View All \(proposal.tasksArray.count) Tasks")
+                                    .fontWeight(.semibold)
+                                    .padding(.vertical, 10)
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.blue.opacity(0.2))
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    }
+                }
             }
         }
-        return 1.0 // Default value
+        .padding(.horizontal)
+        .onAppear {
+            print("DEBUG: Task summary section appeared, task count: \(proposal.tasksArray.count)")
+            print("DEBUG: Proposal ID: \(proposal.id?.uuidString ?? "unknown")")
+            
+            // Diagnostic: Try to fetch tasks directly
+            let fetchRequest: NSFetchRequest<Task> = Task.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "proposal.id == %@", proposal.id! as CVarArg)
+            
+            do {
+                let fetchedTasks = try viewContext.fetch(fetchRequest)
+                print("DEBUG: Directly fetched tasks count: \(fetchedTasks.count)")
+                for task in fetchedTasks {
+                    print("DEBUG: Task ID: \(task.id?.uuidString ?? "unknown"), Title: \(task.title ?? "no title")")
+                }
+            } catch {
+                print("DEBUG: Error fetching tasks directly: \(error)")
+            }
+        }
+    }
+    
+    // MARK: - Activity Summary Section
+    private var activitySummarySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Recent Activity")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                
+                Spacer()
+                
+                HStack(spacing: 15) {
+                    Button(action: { showingAddComment = true }) {
+                        Label("Add Comment", systemImage: "text.bubble")
+                            .foregroundColor(.blue)
+                    }
+                    
+                    NavigationLink(destination: ActivityDetailView(proposal: proposal)) {
+                        Label("View All", systemImage: "list.bullet")
+                            .foregroundColor(.blue)
+                    }
+                }
+            }
+            
+            if proposal.activitiesArray.isEmpty {
+                Text("No activity recorded yet")
+                    .foregroundColor(.gray)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.black.opacity(0.2))
+                    .cornerRadius(10)
+            } else {
+                ZStack {
+                    // Solid background
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.black.opacity(0.2))
+                    
+                    VStack(alignment: .leading, spacing: 0) {
+                        // Only show the 5 most recent activities
+                        ForEach(proposal.activitiesArray.prefix(5), id: \.self) { activity in
+                            HStack(spacing: 12) {
+                                // Timeline dot and line
+                                VStack(spacing: 0) {
+                                    Circle()
+                                        .fill(activity.typeColor)
+                                        .frame(width: 10, height: 10)
+                                    
+                                    if activity != proposal.activitiesArray.prefix(5).last {
+                                        Rectangle()
+                                            .fill(Color.gray.opacity(0.5))
+                                            .frame(width: 2)
+                                    }
+                                }
+                                .frame(height: 50)
+                                
+                                // Activity summary
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(activity.description ?? "")
+                                        .font(.subheadline)
+                                        .foregroundColor(.white)
+                                    
+                                    Text(activity.formattedTimestamp)
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                                
+                                Spacer()
+                            }
+                            .padding(.horizontal)
+                        }
+                        
+                        if proposal.activitiesArray.count > 5 {
+                            NavigationLink(destination: ActivityDetailView(proposal: proposal)) {
+                                Text("View All Activity")
+                                    .fontWeight(.semibold)
+                                    .padding(.vertical, 10)
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.blue.opacity(0.2))
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 8)
+                }
+            }
+        }
+        .padding(.horizontal)
     }
     
     // MARK: - Financial Summary Section
-    
     private var financialSummarySection: some View {
         ZStack {
             // Solid background
@@ -879,11 +1142,19 @@ struct ProposalDetailView: View {
         }
         .padding(.horizontal)
     }
-    TaskSummaryView(proposal: proposal)
-
-    ActivitySummaryView(proposal: proposal)    // Helper view for consistent financial summary rows
     
+    // MARK: - Helper method to calculate multiplier value
+    private func calculateMultiplier(_ item: ProposalItem) -> Double {
+        if let product = item.product, product.listPrice > 0 {
+            let discountFactor = 1.0 - (item.discount / 100.0)
+            if discountFactor > 0 {
+                return item.unitPrice / (product.listPrice * discountFactor)
+            }
+        }
+        return 1.0 // Default value
+    }
     
+    // MARK: - Helper functions and structures
     private func logStatusChange(oldStatus: String, newStatus: String) {
         ActivityLogger.logStatusChanged(
             proposal: proposal,
@@ -893,13 +1164,22 @@ struct ProposalDetailView: View {
         )
     }
 
-    // Function to log proposal edits
     private func logProposalEdit(fieldChanged: String) {
         ActivityLogger.logProposalUpdated(
             proposal: proposal,
             context: viewContext,
             fieldChanged: fieldChanged
         )
+    }
+    
+    private func addComment() {
+        ActivityLogger.logCommentAdded(
+            proposal: proposal,
+            context: viewContext,
+            comment: commentText
+        )
+        
+        commentText = ""
     }
 
     private struct SummaryRow: View {
@@ -941,7 +1221,6 @@ struct ProposalDetailView: View {
         }
         .padding(.horizontal)
     }
- 
     
     private func statusColor(for status: String) -> Color {
         switch status {
@@ -997,6 +1276,14 @@ struct ProposalDetailView: View {
     
     private func deleteEngineering(_ engineering: Engineering) {
         withAnimation {
+            // Log engineering removal
+            ActivityLogger.logItemRemoved(
+                proposal: proposal,
+                context: viewContext,
+                itemType: "Engineering",
+                itemName: engineering.desc ?? "Engineering entry"
+            )
+            
             viewContext.delete(engineering)
             
             do {
@@ -1011,6 +1298,14 @@ struct ProposalDetailView: View {
     
     private func deleteExpense(_ expense: Expense) {
         withAnimation {
+            // Log expense removal
+            ActivityLogger.logItemRemoved(
+                proposal: proposal,
+                context: viewContext,
+                itemType: "Expense",
+                itemName: expense.desc ?? "Expense entry"
+            )
+            
             viewContext.delete(expense)
             
             do {
@@ -1025,6 +1320,14 @@ struct ProposalDetailView: View {
     
     private func deleteTax(_ tax: CustomTax) {
         withAnimation {
+            // Log tax removal
+            ActivityLogger.logItemRemoved(
+                proposal: proposal,
+                context: viewContext,
+                itemType: "Tax",
+                itemName: tax.name ?? "Custom tax"
+            )
+            
             viewContext.delete(tax)
             
             do {

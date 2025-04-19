@@ -1,14 +1,3 @@
-//
-//  AddTaskView.swift
-//  ProposalCRM
-//
-//  Created by Ali Sami Gözükırmızı on 19.04.2025.
-//
-
-
-// AddTaskView.swift
-// Form for adding a new task
-
 import SwiftUI
 import CoreData
 
@@ -111,6 +100,7 @@ struct AddTaskView: View {
     }
     
     private func addTask() {
+        // Create the new task within a transaction
         let task = Task(context: viewContext)
         task.id = UUID()
         task.title = title
@@ -120,9 +110,12 @@ struct AddTaskView: View {
         task.notes = notes
         task.creationDate = Date()
         task.status = "New"
+        
+        // Important: Explicitly set the relationship to this proposal
         task.proposal = proposal
         
         do {
+            // Save the changes to Core Data
             try viewContext.save()
             
             // Log the activity
@@ -132,6 +125,7 @@ struct AddTaskView: View {
                 taskTitle: title
             )
             
+            // Dismiss the view
             presentationMode.wrappedValue.dismiss()
         } catch {
             let nsError = error as NSError

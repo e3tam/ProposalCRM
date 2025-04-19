@@ -228,7 +228,7 @@ struct TaskActivityDashboardView: View {
                         .font(.title2)
                         .fontWeight(.bold)
                     
-                    TaskStatusChart()
+                    TaskStatusChartView()
                         .frame(height: 250)
                         .padding()
                         .background(Color(UIColor.secondarySystemBackground))

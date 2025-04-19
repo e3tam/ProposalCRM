@@ -1,12 +1,17 @@
-// ProposalCRMApp.swift
-// Main entry point for the application
+//
+//  ProposalCRMApp.swift
+//  ProposalCRM
+//
+//  Created by Ali Sami Gözükırmızı on 19.04.2025.
+//
+
 
 import SwiftUI
 
 @main
 struct ProposalCRMApp: App {
     let persistenceController = PersistenceController.shared
-    
+
     var body: some Scene {
         WindowGroup {
             ContentView()

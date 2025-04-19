@@ -6,7 +6,7 @@
         <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="timestamp" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="type" optional="YES" attributeType="String"/>
-        <relationship name="proposal" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Proposal"/>
+        <relationship name="proposal" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Proposal" inverseName="activities" inverseEntity="Proposal"/>
     </entity>
     <entity name="Customer" representedClassName="Customer" syncable="YES" codeGenerationType="class">
         <attribute name="address" optional="YES" attributeType="String"/>
@@ -57,10 +57,12 @@
         <attribute name="number" optional="YES" attributeType="String"/>
         <attribute name="status" optional="YES" attributeType="String"/>
         <attribute name="totalAmount" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <relationship name="activities" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Activity" inverseName="proposal" inverseEntity="Activity"/>
         <relationship name="customer" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Customer" inverseName="proposals" inverseEntity="Customer"/>
         <relationship name="engineering" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Engineering" inverseName="proposal" inverseEntity="Engineering"/>
         <relationship name="expenses" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Expense" inverseName="proposal" inverseEntity="Expense"/>
         <relationship name="items" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="ProposalItem" inverseName="proposal" inverseEntity="ProposalItem"/>
+        <relationship name="tasks" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Task" inverseName="proposal" inverseEntity="Task"/>
         <relationship name="taxes" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="CustomTax" inverseName="proposal" inverseEntity="CustomTax"/>
     </entity>
     <entity name="ProposalItem" representedClassName="ProposalItem" syncable="YES" codeGenerationType="class">
@@ -81,6 +83,6 @@
         <attribute name="priority" optional="YES" attributeType="String"/>
         <attribute name="status" optional="YES" attributeType="String"/>
         <attribute name="title" optional="YES" attributeType="String"/>
-        <relationship name="proposal" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Proposal"/>
+        <relationship name="proposal" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Proposal" inverseName="tasks" inverseEntity="Proposal"/>
     </entity>
 </model>

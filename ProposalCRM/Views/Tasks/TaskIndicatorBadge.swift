@@ -8,6 +8,8 @@
 
 // TaskIndicatorBadge.swift
 // Task indicator badge for ProposalListView
+// TaskIndicatorBadge.swift
+// Task indicator badge for ProposalListView
 
 import SwiftUI
 
@@ -31,7 +33,7 @@ struct TaskIndicatorBadge: View {
                 .cornerRadius(4)
             }
             
-            if let lastActivity = proposal.lastActivity, 
+            if let lastActivity = proposal.lastActivity,
                 Date().timeIntervalSince(lastActivity.timestamp ?? Date()) < 86400 { // Last 24 hours
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.caption)

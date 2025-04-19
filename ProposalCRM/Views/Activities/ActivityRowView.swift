@@ -47,19 +47,7 @@ struct ActivityRowView: View {
                 .font(.subheadline)
                 .foregroundColor(.white)
             
-            // User info if available
-            if let user = activity.userPerformed, !user.isEmpty {
-                HStack {
-                    Text("by")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                    
-                    Text(user)
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                }
-            }
-            
+
             // Details section if available and expanded
             if let details = activity.details, !details.isEmpty, showDetails {
                 VStack(alignment: .leading, spacing: 8) {

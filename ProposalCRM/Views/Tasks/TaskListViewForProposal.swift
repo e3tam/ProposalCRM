@@ -35,7 +35,7 @@ struct TaskListViewForProposal: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: {
-                    NavigationLink(destination: AddTaskView(proposal: proposal))
+                    NavigationLink("Add Task", destination: AddTaskView(proposal: proposal))
                 }) {
                     Label("Add Task", systemImage: "plus")
                 }

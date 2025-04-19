@@ -1,48 +1,62 @@
+//
+//  ContentView.swift
+//  ProposalCRM
+//
+//  Created by Ali Sami Gözükırmızı on 19.04.2025.
+//
+
+
 import SwiftUI
 
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @State private var selectedTab = "Dashboard"
     
     var body: some View {
-        TabView {
-            NavigationView {
-                CustomerListView()
-            }
-            .tabItem {
-                Label("Customers", systemImage: "person.3")
-            }
-            
-            NavigationView {
-                CustomProductListView()
-            }
-            .tabItem {
-                Label("Products", systemImage: "cube.box")
-            }
-            
-            NavigationView {
-                ProposalListView()
-            }
-            .tabItem {
-                Label("Proposals", systemImage: "doc.text")
-            }
-            
-            NavigationView {
-                TaskListView()
-            }
-            .tabItem {
-                Label("Tasks", systemImage: "checklist")
-            }
-            
-            NavigationView {
-                TaskActivityDashboardView()
-            }
-            .tabItem {
-                Label("Dashboard", systemImage: "chart.bar")
+        ZStack {
+            // Custom segmented control for tab selection
+            VStack(spacing: 0) {
+                // Tab bar at top
+                HStack(spacing: 0) {
+                    TabButton(title: "Customers", icon: "person.3", selected: $selectedTab)
+                    TabButton(title: "Products", icon: "cube.box", selected: $selectedTab)
+                    TabButton(title: "Proposals", icon: "doc.text", selected: $selectedTab)
+                    TabButton(title: "Tasks", icon: "checklist", selected: $selectedTab)
+                    TabButton(title: "Dashboard", icon: "chart.bar", selected: $selectedTab)
+                }
+                .padding(.vertical, 8)
+                .background(Color(UIColor.systemGray6))
+                
+                // Content view based on selected tab
+                if selectedTab == "Dashboard" {
+                    // Show dashboard with no navigation view or sidebars
+                    EnhancedDashboardView()
+                        .transition(.opacity)
+                        .edgesIgnoringSafeArea(.all)
+                } else {
+                    // Use navigation view for other tabs
+                    ZStack {
+                        if selectedTab == "Customers" {
+                            NavigationView { CustomerListView() }
+                                .transition(.opacity)
+                        } else if selectedTab == "Products" {
+                            NavigationView { CustomProductListView() }
+                                .transition(.opacity)
+                        } else if selectedTab == "Proposals" {
+                            NavigationView { ProposalListView() }
+                                .transition(.opacity)
+                        } else if selectedTab == "Tasks" {
+                            NavigationView { TaskListView() }
+                                .transition(.opacity)
+                        }
+                    }
+                    .navigationViewStyle(DoubleColumnNavigationViewStyle())
+                }
             }
         }
-        .navigationViewStyle(DoubleColumnNavigationViewStyle())
     }
 }
+
 
 // Enhanced ProposalListView to display task indicators
 struct ProposalListView: View {
@@ -237,6 +251,40 @@ struct ProposalListView: View {
             return .purple
         default:
             return .gray
+        }
+    }
+}
+
+// Tab Button Component
+struct TabButton: View {
+    let title: String
+    let icon: String
+    @Binding var selected: String
+    
+    var body: some View {
+        Button(action: {
+            withAnimation {
+                selected = title
+            }
+        }) {
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 16))
+                Text(title)
+                    .font(.caption)
+            }
+            .foregroundColor(selected == title ? .blue : .gray)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(
+                selected == title ?
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.blue.opacity(0.1))
+                    .padding(.horizontal, 8) :
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.clear)
+                    .padding(.horizontal, 8)
+            )
         }
     }
 }
