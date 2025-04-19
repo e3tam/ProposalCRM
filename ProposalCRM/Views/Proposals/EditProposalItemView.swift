@@ -4,8 +4,14 @@
 //
 //  Created by Ali Sami Gözükırmızı on 19.04.2025.
 //
+
+
+// EditProposalItemView.swift
+// Form for editing existing proposal items
+
 import SwiftUI
 import CoreData
+
 struct EditProposalItemView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.presentationMode) var presentationMode
@@ -13,17 +19,17 @@ struct EditProposalItemView: View {
     
     @State private var quantity: Double
     @State private var discount: Double
+    @State private var unitPrice: Double
     @State private var multiplier: Double = 1.0
     
     init(item: ProposalItem) {
         self.item = item
         _quantity = State(initialValue: item.quantity)
         _discount = State(initialValue: item.discount)
+        _unitPrice = State(initialValue: item.unitPrice)
         
-        // Try to get multiplier if it exists as a dynamic property
-        if item.responds(to: Selector(("multiplier"))) {
-            _multiplier = State(initialValue: item.value(forKey: "multiplier") as? Double ?? 1.0)
-        }
+        // Don't try to access the multiplier property
+        _multiplier = State(initialValue: 1.0) // Default fixed value
     }
     
     var body: some View {
@@ -90,7 +96,10 @@ struct EditProposalItemView: View {
                     HStack {
                         Text("Unit Price")
                         Spacer()
-                        Text(String(format: "%.2f", calculateUnitPrice()))
+                        TextField("Unit Price", value: $unitPrice, formatter: NumberFormatter())
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 100)
                     }
                     
                     HStack {
@@ -133,15 +142,8 @@ struct EditProposalItemView: View {
         }
     }
     
-    private func calculateUnitPrice() -> Double {
-        if let product = item.product {
-            return product.listPrice * multiplier * (1 - discount / 100)
-        }
-        return 0
-    }
-    
     private func calculateAmount() -> Double {
-        return calculateUnitPrice() * quantity
+        return unitPrice * quantity
     }
     
     private func calculateProfit() -> Double {
@@ -165,12 +167,14 @@ struct EditProposalItemView: View {
     private func saveChanges() {
         item.quantity = quantity
         item.discount = discount
-        item.unitPrice = calculateUnitPrice()
+        item.unitPrice = unitPrice
         item.amount = calculateAmount()
         
-        // Save multiplier if supported
-        if item.responds(to: Selector(("setMultiplier:"))) {
-            item.setValue(multiplier, forKey: "multiplier")
+        // Safely set multiplier if the property exists
+        do {
+            try item.setValue(multiplier, forKey: "multiplier")
+        } catch {
+            print("Could not set multiplier property: \(error)")
         }
         
         do {
@@ -195,7 +199,3 @@ struct EditProposalItemView: View {
         }
     }
 }
-
-// HELPER EXTENSION
-// If you don't already have this extension, add it to your project
-

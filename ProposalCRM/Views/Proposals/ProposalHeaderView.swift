@@ -1,5 +1,5 @@
 // ProposalHeaderView.swift
-// Header view for the proposal detail screen
+// Header view for the proposal detail screen with dark theme
 
 import SwiftUI
 
@@ -7,11 +7,12 @@ struct ProposalHeaderView: View {
     @ObservedObject var proposal: Proposal
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 15) {
             HStack {
                 Text(proposal.formattedNumber)
-                    .font(.title)
+                    .font(.title2)
                     .fontWeight(.bold)
+                    .foregroundColor(.white)
                 
                 Spacer()
                 
@@ -23,15 +24,16 @@ struct ProposalHeaderView: View {
                     .cornerRadius(4)
             }
             
-            Divider()
+            Divider().background(Color.gray.opacity(0.5))
             
             HStack {
                 VStack(alignment: .leading) {
                     Text("Customer")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.gray)
                     Text(proposal.customerName)
                         .font(.headline)
+                        .foregroundColor(.white)
                 }
                 
                 Spacer()
@@ -39,22 +41,24 @@ struct ProposalHeaderView: View {
                 VStack(alignment: .trailing) {
                     Text("Date")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.gray)
                     Text(proposal.formattedDate)
                         .font(.headline)
+                        .foregroundColor(.white)
                 }
             }
             
             HStack {
                 Text("Total Amount")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.gray)
                 
                 Spacer()
                 
                 Text(proposal.formattedTotal)
                     .font(.title2)
                     .fontWeight(.bold)
+                    .foregroundColor(.white)
             }
         }
     }
