@@ -1,8 +1,6 @@
-// FinancialSummaryView.swift
-// Dashboard showing financial metrics for all proposals
-
 import SwiftUI
 import CoreData
+import Charts
 
 struct FinancialSummaryView: View {
     @Environment(\.managedObjectContext) private var viewContext
@@ -14,6 +12,7 @@ struct FinancialSummaryView: View {
     @State private var selectedTimePeriod = "All Time"
     
     let timePeriods = ["Last Month", "Last 3 Months", "Last 6 Months", "Last Year", "All Time"]
+    private let statuses = ["Draft", "Pending", "Sent", "Won", "Lost"]
     
     var body: some View {
         ScrollView {
@@ -27,7 +26,28 @@ struct FinancialSummaryView: View {
                 .pickerStyle(SegmentedPickerStyle())
                 .padding(.horizontal)
                 
-                // Status Overview
+                // Chart: Proposal Value by Status
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Proposal Value by Status")
+                        .font(.headline)
+                        .padding(.horizontal)
+                    
+                    Chart {
+                        ForEach(statuses, id: \.self) { status in
+                            BarMark(
+                                x: .value("Status", status),
+                                y: .value("Total Value", proposalValueByStatus(status))
+                            )
+                        }
+                    }
+                    .chartYAxis {
+                        AxisMarks(position: .leading)
+                    }
+                    .frame(height: 200)
+                    .padding(.horizontal)
+                }
+                
+                // Status Overview Cards
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Proposal Status Overview")
                         .font(.title2)
@@ -36,46 +56,20 @@ struct FinancialSummaryView: View {
                     
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 15) {
-                            StatusCardView(
-                                title: "Draft",
-                                count: proposalCountByStatus("Draft"),
-                                value: proposalValueByStatus("Draft"),
-                                color: .gray
-                            )
-                            
-                            StatusCardView(
-                                title: "Pending",
-                                count: proposalCountByStatus("Pending"),
-                                value: proposalValueByStatus("Pending"),
-                                color: .orange
-                            )
-                            
-                            StatusCardView(
-                                title: "Sent",
-                                count: proposalCountByStatus("Sent"),
-                                value: proposalValueByStatus("Sent"),
-                                color: .blue
-                            )
-                            
-                            StatusCardView(
-                                title: "Won",
-                                count: proposalCountByStatus("Won"),
-                                value: proposalValueByStatus("Won"),
-                                color: .green
-                            )
-                            
-                            StatusCardView(
-                                title: "Lost",
-                                count: proposalCountByStatus("Lost"),
-                                value: proposalValueByStatus("Lost"),
-                                color: .red
-                            )
+                            ForEach(statuses, id: \.self) { status in
+                                StatusCardView(
+                                    title: status,
+                                    count: proposalCountByStatus(status),
+                                    value: proposalValueByStatus(status),
+                                    color: colorForStatus(status)
+                                )
+                            }
                         }
                         .padding(.horizontal)
                     }
                 }
                 
-                // Financial Summary
+                // Financial Summary Cards
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Financial Summary")
                         .font(.title2)
@@ -83,7 +77,6 @@ struct FinancialSummaryView: View {
                         .padding(.horizontal)
                     
                     VStack(spacing: 15) {
-                        // Total proposed amount
                         SummaryCardView(
                             title: "Total Proposed",
                             value: totalProposedAmount(),
@@ -92,7 +85,6 @@ struct FinancialSummaryView: View {
                             icon: "doc.text"
                         )
                         
-                        // Won amount
                         SummaryCardView(
                             title: "Won Revenue",
                             value: proposalValueByStatus("Won"),
@@ -101,7 +93,6 @@ struct FinancialSummaryView: View {
                             icon: "checkmark.circle"
                         )
                         
-                        // Average proposal value
                         SummaryCardView(
                             title: "Average Proposal Value",
                             value: averageProposalValue(),
@@ -110,7 +101,6 @@ struct FinancialSummaryView: View {
                             icon: "chart.bar"
                         )
                         
-                        // Average profit margin
                         SummaryCardView(
                             title: "Average Profit Margin",
                             value: averageProfitMargin(),
@@ -128,103 +118,83 @@ struct FinancialSummaryView: View {
         .navigationTitle("Financial Dashboard")
     }
     
-    // MARK: - Filtered Data
+    // MARK: - Helpers
     
-    var filteredProposals: [Proposal] {
-        let filtered = Array(proposals)
-        
-        // If "All Time" is selected, return all proposals
-        if selectedTimePeriod == "All Time" {
-            return filtered
+    private func colorForStatus(_ status: String) -> Color {
+        switch status {
+        case "Draft": return .gray
+        case "Pending": return .orange
+        case "Sent": return .blue
+        case "Won": return .green
+        case "Lost": return .red
+        default: return .secondary
         }
-        
-        // Get cutoff date based on selected time period
-        let calendar = Calendar.current
-        let now = Date()
-        var cutoffDate: Date?
-        
-        switch selectedTimePeriod {
-        case "Last Month":
-            cutoffDate = calendar.date(byAdding: .month, value: -1, to: now)
-        case "Last 3 Months":
-            cutoffDate = calendar.date(byAdding: .month, value: -3, to: now)
-        case "Last 6 Months":
-            cutoffDate = calendar.date(byAdding: .month, value: -6, to: now)
-        case "Last Year":
-            cutoffDate = calendar.date(byAdding: .year, value: -1, to: now)
-        default:
-            cutoffDate = nil
-        }
-        
-        // Filter proposals by date
-        if let cutoffDate = cutoffDate {
-            return filtered.filter { proposal in
-                if let date = proposal.creationDate {
-                    return date >= cutoffDate
-                }
-                return false
-            }
-        }
-        
-        return filtered
     }
     
-    // MARK: - Financial Calculations
+    var filteredProposals: [Proposal] {
+        let all = Array(proposals)
+        guard selectedTimePeriod != "All Time" else { return all }
+        let cal = Calendar.current
+        let now = Date()
+        let cutoff: Date? = {
+            switch selectedTimePeriod {
+            case "Last Month":   return cal.date(byAdding: .month, value: -1, to: now)
+            case "Last 3 Months":return cal.date(byAdding: .month, value: -3, to: now)
+            case "Last 6 Months":return cal.date(byAdding: .month, value: -6, to: now)
+            case "Last Year":    return cal.date(byAdding: .year,  value: -1, to: now)
+            default: return nil
+            }
+        }()
+        if let cutoff = cutoff {
+            return all.filter { $0.creationDate ?? Date() >= cutoff }
+        }
+        return all
+    }
     
     private func proposalCountByStatus(_ status: String) -> Int {
-        return filteredProposals.filter { $0.status == status }.count
+        filteredProposals.filter { $0.status == status }.count
     }
     
     private func proposalValueByStatus(_ status: String) -> Double {
-        let statusProposals = filteredProposals.filter { $0.status == status }
-        return statusProposals.reduce(0) { $0 + $1.totalAmount }
+        filteredProposals
+            .filter { $0.status == status }
+            .reduce(0) { $0 + $1.totalAmount }
     }
     
     private func totalProposedAmount() -> Double {
-        return filteredProposals.reduce(0) { $0 + $1.totalAmount }
+        filteredProposals.reduce(0) { $0 + $1.totalAmount }
     }
     
     private func averageProposalValue() -> Double {
-        if filteredProposals.isEmpty {
-            return 0
-        }
-        return totalProposedAmount() / Double(filteredProposals.count)
+        let vals = filteredProposals.map { $0.totalAmount }
+        guard !vals.isEmpty else { return 0 }
+        return vals.reduce(0, +) / Double(vals.count)
     }
     
     private func medianProposalValue() -> Double {
-        let values = filteredProposals.map { $0.totalAmount }.sorted()
-        
-        if values.isEmpty {
-            return 0
-        }
-        
-        if values.count % 2 == 0 {
-            let midIndex = values.count / 2
-            return (values[midIndex - 1] + values[midIndex]) / 2
-        } else {
-            return values[values.count / 2]
-        }
-    }
-    
-    private func successRate() -> Double {
-        let totalCompleted = proposalCountByStatus("Won") + proposalCountByStatus("Lost")
-        if totalCompleted == 0 {
-            return 0
-        }
-        return Double(proposalCountByStatus("Won")) / Double(totalCompleted) * 100
-    }
-    
-    private func averageProfitMargin() -> Double {
-        let relevantProposals = filteredProposals.filter { $0.totalAmount > 0 }
-        if relevantProposals.isEmpty {
-            return 0
-        }
-        
-        let totalMargin = relevantProposals.reduce(0) { $0 + $1.profitMargin }
-        return totalMargin / Double(relevantProposals.count)
+        let vals = filteredProposals.map { $0.totalAmount }.sorted()
+        guard !vals.isEmpty else { return 0 }
+        let mid = vals.count / 2
+        return vals.count.isMultiple(of: 2)
+            ? (vals[mid - 1] + vals[mid]) / 2
+            : vals[mid]
     }
     
     private func totalProfit() -> Double {
-        return filteredProposals.reduce(0) { $0 + $1.grossProfit }
+        filteredProposals.reduce(0) {
+            $0 + ($1.totalAmount - $1.totalCost)
+        }
+    }
+    
+    private func averageProfitMargin() -> Double {
+        let margins = filteredProposals.map { $0.profitMargin }
+        guard !margins.isEmpty else { return 0 }
+        return margins.reduce(0, +) / Double(margins.count)
+    }
+    
+    private func successRate() -> Double {
+        guard !filteredProposals.isEmpty else { return 0 }
+        let won = proposalCountByStatus("Won")
+        return (Double(won) / Double(filteredProposals.count)) * 100
     }
 }
