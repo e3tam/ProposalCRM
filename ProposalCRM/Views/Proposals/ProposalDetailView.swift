@@ -6,7 +6,7 @@
 //
 
 
-// ProposalDetailView.swift
+// ProposalDetailView.swift with fixed header section
 // Shows the detailed view of a proposal with all its components
 
 import SwiftUI
@@ -46,73 +46,489 @@ struct ProposalDetailView: View {
     @State private var showEditTaxSheet = false
     
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // Back button and proposal title
-                HStack {
-                    NavigationLink(destination: EmptyView()) {
-                        HStack {
-                            Image(systemName: "chevron.left")
-                            Text("Customer Details")
+        ZStack {
+            // Solid background to prevent drawing overlay issues
+            Color.black.edgesIgnoringSafeArea(.all)
+            
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Fixed header section using a separate component with action callback
+                    ProposalHeaderSection(
+                        proposal: proposal,
+                        onEditTapped: {
+                            showingEditProposal = true
                         }
-                        .foregroundColor(.blue)
+                    )
+                    
+                    // Content sections with proper spacing
+                    VStack(alignment: .leading, spacing: 20) {
+                        // Products Section
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Text("Products")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                
+                                Spacer()
+                                
+                                Button(action: { showingItemSelection = true }) {
+                                    Label("Add Products", systemImage: "plus")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            
+                            if proposal.itemsArray.isEmpty {
+                                ZStack {
+                                    Rectangle()
+                                        .fill(Color.black.opacity(0.3))
+                                        .cornerRadius(8)
+                                    
+                                    Text("No products added yet")
+                                        .foregroundColor(.gray)
+                                        .padding()
+                                }
+                                .frame(height: 80)
+                            } else {
+                                // Product table with fixed rendering
+                                ZStack {
+                                    // Solid background first
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color.black.opacity(0.2))
+                                    
+                                    // Table content
+                                    VStack(spacing: 0) {
+                                        // Table header
+                                        HStack {
+                                            Text("Product Name")
+                                                .font(.caption)
+                                                .fontWeight(.bold)
+                                                .frame(width: 200, alignment: .leading)
+                                            
+                                            Spacer()
+                                            
+                                            Text("Qty")
+                                                .font(.caption)
+                                                .fontWeight(.bold)
+                                                .frame(width: 40)
+                                            
+                                            Spacer()
+                                            
+                                            Text("Price")
+                                                .font(.caption)
+                                                .fontWeight(.bold)
+                                                .frame(width: 80, alignment: .trailing)
+                                            
+                                            Text("Act")
+                                                .font(.caption)
+                                                .fontWeight(.bold)
+                                                .frame(width: 60, alignment: .center)
+                                        }
+                                        .padding(.horizontal)
+                                        .padding(.vertical, 8)
+                                        .background(Color.black.opacity(0.3))
+                                        
+                                        Divider().background(Color.gray)
+                                        
+                                        // Product rows
+                                        ForEach(proposal.itemsArray, id: \.self) { item in
+                                            HStack {
+                                                VStack(alignment: .leading, spacing: 4) {
+                                                    Text(item.productName)
+                                                        .font(.subheadline)
+                                                        .foregroundColor(.white)
+                                                    
+                                                    Text(item.productCode)
+                                                        .font(.caption)
+                                                        .foregroundColor(.gray)
+                                                }
+                                                .frame(width: 200, alignment: .leading)
+                                                
+                                                Spacer()
+                                                
+                                                Text("\(Int(item.quantity))")
+                                                    .font(.subheadline)
+                                                    .frame(width: 40)
+                                                
+                                                Spacer()
+                                                
+                                                Text(String(format: "%.2f", item.amount))
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.white)
+                                                    .frame(width: 80, alignment: .trailing)
+                                                
+                                                HStack(spacing: 15) {
+                                                    Button(action: {
+                                                        itemToEdit = item
+                                                        showEditItemSheet = true
+                                                    }) {
+                                                        Image(systemName: "pencil")
+                                                            .foregroundColor(.blue)
+                                                    }
+                                                    
+                                                    Button(action: {
+                                                        itemToDelete = item
+                                                        showDeleteConfirmation = true
+                                                    }) {
+                                                        Image(systemName: "trash")
+                                                            .foregroundColor(.red)
+                                                    }
+                                                }
+                                                .frame(width: 60, alignment: .center)
+                                            }
+                                            .padding(.horizontal)
+                                            .padding(.vertical, 8)
+                                            .background(Color.black.opacity(0.1))
+                                            
+                                            Divider().background(Color.gray.opacity(0.3))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                        
+                        // Engineering Section - fixed rendering
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Text("Engineering")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                
+                                if proposal.engineeringArray.count > 0 {
+                                    Text("(\(proposal.engineeringArray.count))")
+                                        .font(.subheadline)
+                                        .foregroundColor(.gray)
+                                }
+                                
+                                Spacer()
+                                
+                                Button(action: { showingEngineeringForm = true }) {
+                                    Label("Add", systemImage: "plus")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            
+                            ZStack {
+                                // Solid background
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color.black.opacity(0.2))
+                                
+                                // Table content
+                                VStack(spacing: 0) {
+                                    // Header
+                                    HStack {
+                                        Text("Description")
+                                            .font(.caption)
+                                            .fontWeight(.bold)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                        
+                                        Text("Days")
+                                            .font(.caption)
+                                            .fontWeight(.bold)
+                                            .frame(width: 60, alignment: .center)
+                                        
+                                        Text("Rate")
+                                            .font(.caption)
+                                            .fontWeight(.bold)
+                                            .frame(width: 80, alignment: .trailing)
+                                        
+                                        Text("Amount")
+                                            .font(.caption)
+                                            .fontWeight(.bold)
+                                            .frame(width: 100, alignment: .trailing)
+                                        
+                                        Text("Act")
+                                            .font(.caption)
+                                            .fontWeight(.bold)
+                                            .frame(width: 60, alignment: .center)
+                                    }
+                                    .padding(.horizontal)
+                                    .padding(.vertical, 8)
+                                    .background(Color.black.opacity(0.3))
+                                    
+                                    Divider().background(Color.gray)
+                                    
+                                    // Engineering rows or empty state
+                                    if proposal.engineeringArray.isEmpty {
+                                        Text("No engineering services added yet")
+                                            .foregroundColor(.gray)
+                                            .padding()
+                                            .frame(maxWidth: .infinity)
+                                    } else {
+                                        ForEach(proposal.engineeringArray, id: \.self) { engineering in
+                                            HStack {
+                                                Text(engineering.desc ?? "")
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.white)
+                                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                                
+                                                Text(String(format: "%.1f", engineering.days))
+                                                    .font(.subheadline)
+                                                    .frame(width: 60, alignment: .center)
+                                                
+                                                Text(String(format: "%.2f", engineering.rate))
+                                                    .font(.subheadline)
+                                                    .frame(width: 80, alignment: .trailing)
+                                                
+                                                Text(String(format: "%.2f", engineering.amount))
+                                                    .font(.subheadline)
+                                                    .fontWeight(.semibold)
+                                                    .foregroundColor(.white)
+                                                    .frame(width: 100, alignment: .trailing)
+                                                
+                                                HStack(spacing: 15) {
+                                                    Button(action: {
+                                                        engineeringToEdit = engineering
+                                                        showEditEngineeringSheet = true
+                                                    }) {
+                                                        Image(systemName: "pencil")
+                                                            .foregroundColor(.blue)
+                                                    }
+                                                    
+                                                    Button(action: {
+                                                        deleteEngineering(engineering)
+                                                    }) {
+                                                        Image(systemName: "trash")
+                                                            .foregroundColor(.red)
+                                                    }
+                                                }
+                                                .frame(width: 60, alignment: .center)
+                                            }
+                                            .padding(.horizontal)
+                                            .padding(.vertical, 8)
+                                            .background(Color.black.opacity(0.1))
+                                            
+                                            Divider().background(Color.gray.opacity(0.3))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                        
+                        // Expenses Section - fixed rendering
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Text("Expenses")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                
+                                if proposal.expensesArray.count > 0 {
+                                    Text("(\(proposal.expensesArray.count))")
+                                        .font(.subheadline)
+                                        .foregroundColor(.gray)
+                                }
+                                
+                                Spacer()
+                                
+                                Button(action: { showingExpensesForm = true }) {
+                                    Label("Add", systemImage: "plus")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            
+                            ZStack {
+                                // Solid background
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color.black.opacity(0.2))
+                                
+                                // Table content
+                                VStack(spacing: 0) {
+                                    // Header
+                                    HStack {
+                                        Text("Description")
+                                            .font(.caption)
+                                            .fontWeight(.bold)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                        
+                                        Text("Amount")
+                                            .font(.caption)
+                                            .fontWeight(.bold)
+                                            .frame(width: 100, alignment: .trailing)
+                                        
+                                        Text("Act")
+                                            .font(.caption)
+                                            .fontWeight(.bold)
+                                            .frame(width: 60, alignment: .center)
+                                    }
+                                    .padding(.horizontal)
+                                    .padding(.vertical, 8)
+                                    .background(Color.black.opacity(0.3))
+                                    
+                                    Divider().background(Color.gray)
+                                    
+                                    // Expense rows or empty state
+                                    if proposal.expensesArray.isEmpty {
+                                        Text("No expenses added yet")
+                                            .foregroundColor(.gray)
+                                            .padding()
+                                            .frame(maxWidth: .infinity)
+                                    } else {
+                                        ForEach(proposal.expensesArray, id: \.self) { expense in
+                                            HStack {
+                                                Text(expense.desc ?? "")
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.white)
+                                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                                
+                                                Text(String(format: "%.2f", expense.amount))
+                                                    .font(.subheadline)
+                                                    .fontWeight(.semibold)
+                                                    .foregroundColor(.white)
+                                                    .frame(width: 100, alignment: .trailing)
+                                                
+                                                HStack(spacing: 15) {
+                                                    Button(action: {
+                                                        expenseToEdit = expense
+                                                        showEditExpenseSheet = true
+                                                    }) {
+                                                        Image(systemName: "pencil")
+                                                            .foregroundColor(.blue)
+                                                    }
+                                                    
+                                                    Button(action: {
+                                                        deleteExpense(expense)
+                                                    }) {
+                                                        Image(systemName: "trash")
+                                                            .foregroundColor(.red)
+                                                    }
+                                                }
+                                                .frame(width: 60, alignment: .center)
+                                            }
+                                            .padding(.horizontal)
+                                            .padding(.vertical, 8)
+                                            .background(Color.black.opacity(0.1))
+                                            
+                                            Divider().background(Color.gray.opacity(0.3))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                        
+                        // Custom Taxes Section - fixed rendering
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Text("Custom Taxes")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                
+                                Spacer()
+                                
+                                Button(action: { showingCustomTaxForm = true }) {
+                                    Label("Add", systemImage: "plus")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            
+                            ZStack {
+                                // Solid background
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color.black.opacity(0.2))
+                                
+                                // Table content
+                                VStack(spacing: 0) {
+                                    // Header
+                                    HStack {
+                                        Text("Tax Name")
+                                            .font(.caption)
+                                            .fontWeight(.bold)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                        
+                                        Text("Rate")
+                                            .font(.caption)
+                                            .fontWeight(.bold)
+                                            .frame(width: 80, alignment: .trailing)
+                                        
+                                        Text("Amount")
+                                            .font(.caption)
+                                            .fontWeight(.bold)
+                                            .frame(width: 100, alignment: .trailing)
+                                        
+                                        Text("Act")
+                                            .font(.caption)
+                                            .fontWeight(.bold)
+                                            .frame(width: 60, alignment: .center)
+                                    }
+                                    .padding(.horizontal)
+                                    .padding(.vertical, 8)
+                                    .background(Color.black.opacity(0.3))
+                                    
+                                    Divider().background(Color.gray)
+                                    
+                                    // Custom tax rows or empty state
+                                    if proposal.taxesArray.isEmpty {
+                                        Text("No custom taxes added yet")
+                                            .foregroundColor(.gray)
+                                            .padding()
+                                            .frame(maxWidth: .infinity)
+                                    } else {
+                                        ForEach(proposal.taxesArray, id: \.self) { tax in
+                                            HStack {
+                                                Text(tax.name ?? "")
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.white)
+                                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                                
+                                                Text(String(format: "%.1f%%", tax.rate))
+                                                    .font(.subheadline)
+                                                    .frame(width: 80, alignment: .trailing)
+                                                
+                                                Text(String(format: "%.2f", tax.amount))
+                                                    .font(.subheadline)
+                                                    .fontWeight(.semibold)
+                                                    .foregroundColor(.white)
+                                                    .frame(width: 100, alignment: .trailing)
+                                                
+                                                HStack(spacing: 15) {
+                                                    Button(action: {
+                                                        taxToEdit = tax
+                                                        showEditTaxSheet = true
+                                                    }) {
+                                                        Image(systemName: "pencil")
+                                                            .foregroundColor(.blue)
+                                                    }
+                                                    
+                                                    Button(action: {
+                                                        deleteTax(tax)
+                                                    }) {
+                                                        Image(systemName: "trash")
+                                                            .foregroundColor(.red)
+                                                    }
+                                                }
+                                                .frame(width: 60, alignment: .center)
+                                            }
+                                            .padding(.horizontal)
+                                            .padding(.vertical, 8)
+                                            .background(Color.black.opacity(0.1))
+                                            
+                                            Divider().background(Color.gray.opacity(0.3))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                        
+                        // Financial Summary
+                        financialSummarySection
+                        
+                        // Notes Section
+                        if let notes = proposal.notes, !notes.isEmpty {
+                            notesSection(notes: notes)
+                        }
                     }
-                    
-                    Spacer()
-                    
-                    Text("Proposal Details")
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                    
-                    Spacer()
-                    
-                    Button(action: { showingEditProposal = true }) {
-                        Image(systemName: "square.and.pencil")
-                            .foregroundColor(.blue)
-                            .font(.title2)
-                    }
-                }
-                .padding(.horizontal)
-                
-                // Proposal header
-                ProposalHeaderView(proposal: proposal)
-                    .padding()
-                    .background(Color.black.opacity(0.3))
-                    .cornerRadius(10)
-                
-                // Products Section
-                productsSection
-                
-                // Engineering Section
-                engineeringSection
-                
-                // Expenses Section
-                expensesSection
-                
-                // Custom Taxes Section
-                customTaxesSection
-                
-                // Financial Summary
-                financialSummarySection
-                
-                // Notes Section
-                if let notes = proposal.notes, !notes.isEmpty {
-                    notesSection(notes: notes)
+                    .padding(.vertical, 20)
                 }
             }
-            .padding(.vertical)
         }
-        .background(Color.black)
-        .edgesIgnoringSafeArea(.all)
-        .navigationTitle("Proposal Details")
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: { showingEditProposal = true }) {
-                    Label("Edit", systemImage: "pencil")
-                }
-            }
-        }
+        .navigationBarHidden(true)
+        // SHEET PRESENTATIONS
         .sheet(isPresented: $showingItemSelection) {
             ItemSelectionView(proposal: proposal)
         }
@@ -131,9 +547,51 @@ struct ProposalDetailView: View {
         .sheet(isPresented: $showingFinancialDetails) {
             FinancialSummaryDetailView(proposal: proposal)
         }
+        .sheet(isPresented: $showEditEngineeringSheet) {
+            if let engineering = engineeringToEdit {
+                NavigationView {
+                    EditEngineeringView(engineering: engineering)
+                        .navigationTitle("Edit Engineering")
+                        .navigationBarItems(trailing: Button("Done") {
+                            showEditEngineeringSheet = false
+                            updateProposalTotal()
+                        })
+                }
+            }
+        }
+        .sheet(isPresented: $showEditExpenseSheet) {
+            if let expense = expenseToEdit {
+                NavigationView {
+                    EditExpenseView(expense: expense)
+                        .navigationTitle("Edit Expense")
+                        .navigationBarItems(trailing: Button("Done") {
+                            showEditExpenseSheet = false
+                            updateProposalTotal()
+                        })
+                }
+            }
+        }
+        .sheet(isPresented: $showEditTaxSheet) {
+            if let tax = taxToEdit {
+                NavigationView {
+                    EditCustomTaxView(customTax: tax, proposal: proposal)
+                        .navigationTitle("Edit Custom Tax")
+                        .navigationBarItems(trailing: Button("Done") {
+                            showEditTaxSheet = false
+                            updateProposalTotal()
+                        })
+                }
+            }
+        }
         .sheet(isPresented: $showEditItemSheet) {
             if let item = itemToEdit {
-                EditProposalItemView(item: item)
+                NavigationView {
+                    EditProposalItemView(item: item)
+                        .navigationBarItems(trailing: Button("Done") {
+                            showEditItemSheet = false
+                            updateProposalTotal()
+                        })
+                }
             }
         }
         .alert("Delete Item?", isPresented: $showDeleteConfirmation) {
@@ -148,319 +606,96 @@ struct ProposalDetailView: View {
         }
     }
     
-    // MARK: - Sections
-    
-    private var productsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Products")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                
-                Spacer()
-                
-                Button(action: { showingItemSelection = true }) {
-                    Label("Add Products", systemImage: "plus")
-                        .foregroundColor(.blue)
-                }
-            }
-            
-            if proposal.itemsArray.isEmpty {
-                Text("No products added yet")
-                    .foregroundColor(.gray)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding()
-                    .background(Color.black.opacity(0.2))
-                    .cornerRadius(8)
-            } else {
-                // Use our custom ProductTableView with the proposal and callbacks
-                ProductTableView(
-                    proposal,
-                    onDelete: { item in
-                        itemToDelete = item
-                        showDeleteConfirmation = true
-                    },
-                    onEdit: { item in
-                        itemToEdit = item
-                        showEditItemSheet = true
-                    }
-                )
-            }
-        }
-        .padding(.horizontal)
-    }
-    
-    private var engineeringSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Engineering")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                
-                if proposal.engineeringArray.count > 0 {
-                    Text("(\(proposal.engineeringArray.count))")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                }
-                
-                Spacer()
-                
-                Button(action: { showingEngineeringForm = true }) {
-                    Label("Add", systemImage: "plus")
-                        .foregroundColor(.blue)
-                }
-            }
-            
-            // Use our custom EngineeringTableView with direct callbacks instead of state variables
-            EngineeringTableView(
-                proposal,
-                onDelete: { engineering in
-                    viewContext.delete(engineering)
-                    
-                    do {
-                        try viewContext.save()
-                        updateProposalTotal()
-                    } catch {
-                        print("Error deleting engineering: \(error)")
-                    }
-                },
-                onEdit: { engineering in
-                    // Set the engineering to edit and show the sheet
-                    engineeringToEdit = engineering
-                    showEditEngineeringSheet = true
-                }
-            )
-        }
-        .padding(.horizontal)
-        .sheet(isPresented: $showEditEngineeringSheet) {
-            if let engineering = engineeringToEdit {
-                NavigationView {
-                    EngineeringEditMenu(
-                        engineering: engineering,
-                        isPresented: $showEditEngineeringSheet,
-                        onSave: {
-                            updateProposalTotal()
-                        }
-                    )
-                    .navigationTitle("Edit Engineering")
-                    .navigationBarItems(trailing: Button("Done") {
-                        showEditEngineeringSheet = false
-                    })
-                }
-            }
-        }
-    }
-    
-    private var expensesSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Expenses")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                
-                if proposal.expensesArray.count > 0 {
-                    Text("(\(proposal.expensesArray.count))")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                }
-                
-                Spacer()
-                
-                Button(action: { showingExpensesForm = true }) {
-                    Label("Add", systemImage: "plus")
-                        .foregroundColor(.blue)
-                }
-            }
-            
-            // Use our custom ExpensesTableView with direct callbacks
-            ExpensesTableView(
-                proposal,
-                onDelete: { expense in
-                    viewContext.delete(expense)
-                    
-                    do {
-                        try viewContext.save()
-                        updateProposalTotal()
-                    } catch {
-                        print("Error deleting expense: \(error)")
-                    }
-                },
-                onEdit: { expense in
-                    // Set the expense to edit and show the sheet
-                    expenseToEdit = expense
-                    showEditExpenseSheet = true
-                }
-            )
-        }
-        .padding(.horizontal)
-        .sheet(isPresented: $showEditExpenseSheet) {
-            if let expense = expenseToEdit {
-                NavigationView {
-                    ExpensesEditMenu(
-                        expense: expense,
-                        isPresented: $showEditExpenseSheet,
-                        onSave: {
-                            updateProposalTotal()
-                        }
-                    )
-                    .navigationTitle("Edit Expense")
-                    .navigationBarItems(trailing: Button("Done") {
-                        showEditExpenseSheet = false
-                    })
-                }
-            }
-        }
-    }
-    
-    private var customTaxesSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Custom Taxes")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                
-                if proposal.taxesArray.count > 0 {
-                    Text("(\(proposal.taxesArray.count))")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                }
-                
-                Spacer()
-                
-                Button(action: { showingCustomTaxForm = true }) {
-                    Label("Add", systemImage: "plus")
-                        .foregroundColor(.blue)
-                }
-            }
-            
-            // Use our custom CustomTaxesTableView with direct callbacks
-            CustomTaxesTableView(
-                proposal,
-                onDelete: { tax in
-                    viewContext.delete(tax)
-                    
-                    do {
-                        try viewContext.save()
-                        updateProposalTotal()
-                    } catch {
-                        print("Error deleting tax: \(error)")
-                    }
-                },
-                onEdit: { tax in
-                    // Set the tax to edit and show the sheet
-                    taxToEdit = tax
-                    showEditTaxSheet = true
-                }
-            )
-        }
-        .padding(.horizontal)
-        .sheet(isPresented: $showEditTaxSheet) {
-            if let tax = taxToEdit {
-                NavigationView {
-                    CustomTaxEditMenu(
-                        customTax: tax,
-                        proposal: proposal,
-                        isPresented: $showEditTaxSheet,
-                        onSave: {
-                            updateProposalTotal()
-                        }
-                    )
-                    .navigationTitle("Edit Custom Tax")
-                    .navigationBarItems(trailing: Button("Done") {
-                        showEditTaxSheet = false
-                    })
-                }
-            }
-        }
-    }
+    // MARK: - Financial Summary Section
     
     private var financialSummarySection: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            // Progress bar at the top
-            Rectangle()
-                .frame(height: 4)
-                .foregroundColor(.gray.opacity(0.3))
-                .overlay(
-                    GeometryReader { geometry in
-                        Rectangle()
-                            .frame(width: geometry.size.width * 0.65)
+        ZStack {
+            // Solid background
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.black.opacity(0.2))
+            
+            VStack(alignment: .leading, spacing: 15) {
+                // Progress bar at the top
+                Rectangle()
+                    .frame(height: 4)
+                    .foregroundColor(.gray.opacity(0.3))
+                    .overlay(
+                        GeometryReader { geometry in
+                            Rectangle()
+                                .frame(width: geometry.size.width * 0.65)
+                                .foregroundColor(.white)
+                        }
+                    )
+                    .cornerRadius(2)
+                    .padding(.bottom, 20)
+                
+                HStack {
+                    Text("Financial Summary")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                    
+                    Spacer()
+                    
+                    Button(action: { showingFinancialDetails = true }) {
+                        Label("Details", systemImage: "chart.bar")
+                            .foregroundColor(.blue)
+                    }
+                }
+                
+                Group {
+                    SummaryRow(title: "Products Subtotal", value: proposal.subtotalProducts)
+                    SummaryRow(title: "Engineering Subtotal", value: proposal.subtotalEngineering)
+                    SummaryRow(title: "Expenses Subtotal", value: proposal.subtotalExpenses)
+                    SummaryRow(title: "Taxes", value: proposal.subtotalTaxes)
+                    
+                    // Total with more prominent styling
+                    HStack {
+                        Text("Total")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                        Spacer()
+                        Text(String(format: "%.2f", proposal.totalAmount))
+                            .font(.title3)
+                            .fontWeight(.bold)
                             .foregroundColor(.white)
                     }
-                )
-                .cornerRadius(2)
-                .padding(.bottom, 20)
-            
-            HStack {
-                Text("Financial Summary")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                
-                Spacer()
-                
-                Button(action: { showingFinancialDetails = true }) {
-                    Label("Details", systemImage: "chart.bar")
-                        .foregroundColor(.blue)
+                    .padding(.vertical, 5)
+                    
+                    Divider().background(Color.gray.opacity(0.5))
+                    
+                    // Partner Cost Section
+                    let partnerCost = calculatePartnerCost()
+                    SummaryRow(title: "Partner Cost", value: partnerCost, titleColor: .gray, valueColor: .gray)
+                    
+                    // Total Profit
+                    let totalProfit = proposal.totalAmount - partnerCost
+                    HStack {
+                        Text("Total Profit")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                        Spacer()
+                        Text(String(format: "%.2f", totalProfit))
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundColor(totalProfit >= 0 ? .green : .red)
+                    }
+                    .padding(.vertical, 5)
+                    
+                    // Profit Margin
+                    HStack {
+                        Text("Profit Margin")
+                            .foregroundColor(.white)
+                        Spacer()
+                        Text(String(format: "%.1f%%", proposal.totalAmount > 0 ? (totalProfit / proposal.totalAmount) * 100 : 0))
+                            .fontWeight(.semibold)
+                            .foregroundColor(totalProfit >= 0 ? .green : .red)
+                    }
                 }
             }
-            
-            Group {
-                SummaryRow(title: "Products Subtotal", value: proposal.subtotalProducts)
-                SummaryRow(title: "Engineering Subtotal", value: proposal.subtotalEngineering)
-                SummaryRow(title: "Expenses Subtotal", value: proposal.subtotalExpenses)
-                SummaryRow(title: "Taxes", value: proposal.subtotalTaxes)
-                
-                // Total with more prominent styling
-                HStack {
-                    Text("Total")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                    Spacer()
-                    Text(String(format: "%.2f", proposal.totalAmount))
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                }
-                .padding(.vertical, 5)
-                
-                Divider().background(Color.gray.opacity(0.5))
-                
-                // Partner Cost Section
-                let partnerCost = calculatePartnerCost()
-                SummaryRow(title: "Partner Cost", value: partnerCost, titleColor: .gray, valueColor: .gray)
-                
-                // Total Profit
-                let totalProfit = proposal.totalAmount - partnerCost
-                HStack {
-                    Text("Total Profit")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                    Spacer()
-                    Text(String(format: "%.2f", totalProfit))
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundColor(totalProfit >= 0 ? .green : .red)
-                }
-                .padding(.vertical, 5)
-                
-                // Profit Margin
-                HStack {
-                    Text("Profit Margin")
-                        .foregroundColor(.white)
-                    Spacer()
-                    Text(String(format: "%.1f%%", proposal.totalAmount > 0 ? (totalProfit / proposal.totalAmount) * 100 : 0))
-                        .fontWeight(.semibold)
-                        .foregroundColor(totalProfit >= 0 ? .green : .red)
-                }
-            }
+            .padding()
         }
-        .padding()
-        .background(Color.black.opacity(0.3))
-        .cornerRadius(10)
+        .padding(.horizontal)
     }
     
     // Helper view for consistent financial summary rows
@@ -483,23 +718,40 @@ struct ProposalDetailView: View {
     }
     
     private func notesSection(notes: String) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Notes")
-                .font(.title2)
-                .fontWeight(.bold)
+        ZStack {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.black.opacity(0.2))
             
-            Divider()
-            
-            Text(notes)
-                .foregroundColor(.secondary)
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Notes")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                
+                Divider()
+                    .background(Color.gray.opacity(0.5))
+                
+                Text(notes)
+                    .foregroundColor(.white)
+            }
+            .padding()
         }
-        .padding()
-        .background(Color(UIColor.systemBackground))
-        .cornerRadius(10)
-        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        .padding(.horizontal)
     }
     
     // MARK: - Helper Functions
+    
+    private func statusColor(for status: String) -> Color {
+        switch status {
+        case "Draft": return .gray
+        case "Pending": return .orange
+        case "Sent": return .blue
+        case "Won": return .green
+        case "Lost": return .red
+        case "Expired": return .purple
+        default: return .gray
+        }
+    }
     
     private func calculatePartnerCost() -> Double {
         var totalCost = 0.0
@@ -523,12 +775,52 @@ struct ProposalDetailView: View {
             
             do {
                 try viewContext.save()
-                
-                // Update proposal total
                 updateProposalTotal()
             } catch {
                 let nsError = error as NSError
                 print("Error deleting item: \(nsError), \(nsError.userInfo)")
+            }
+        }
+    }
+    
+    private func deleteEngineering(_ engineering: Engineering) {
+        withAnimation {
+            viewContext.delete(engineering)
+            
+            do {
+                try viewContext.save()
+                updateProposalTotal()
+            } catch {
+                let nsError = error as NSError
+                print("Error deleting engineering: \(nsError), \(nsError.userInfo)")
+            }
+        }
+    }
+    
+    private func deleteExpense(_ expense: Expense) {
+        withAnimation {
+            viewContext.delete(expense)
+            
+            do {
+                try viewContext.save()
+                updateProposalTotal()
+            } catch {
+                let nsError = error as NSError
+                print("Error deleting expense: \(nsError), \(nsError.userInfo)")
+            }
+        }
+    }
+    
+    private func deleteTax(_ tax: CustomTax) {
+        withAnimation {
+            viewContext.delete(tax)
+            
+            do {
+                try viewContext.save()
+                updateProposalTotal()
+            } catch {
+                let nsError = error as NSError
+                print("Error deleting tax: \(nsError), \(nsError.userInfo)")
             }
         }
     }

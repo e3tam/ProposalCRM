@@ -1,4 +1,16 @@
+//
+//  EngineeringView.swift
+//  ProposalCRM
+//
+//  Created by Ali Sami Gözükırmızı on 19.04.2025.
+//
+
+
+// EngineeringView.swift
+// View for adding new engineering entries
+
 import SwiftUI
+import CoreData
 
 struct EngineeringView: View {
     @Environment(\.managedObjectContext) private var viewContext
