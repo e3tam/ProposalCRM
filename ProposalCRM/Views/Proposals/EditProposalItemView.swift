@@ -2,14 +2,6 @@
 //  EditProposalItemView.swift
 //  ProposalCRM
 //
-//  Created by Ali Sami Gözükırmızı on 19.04.2025.
-//
-
-
-//
-//  EditProposalItemView.swift
-//  ProposalCRM
-//
 
 import SwiftUI
 import CoreData
@@ -18,22 +10,36 @@ struct EditProposalItemView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.presentationMode) var presentationMode
     @ObservedObject var item: ProposalItem
-    @Binding var didSave: Bool  // Added binding to signal changes were saved
+    @Binding var didSave: Bool
     
     // Editable properties
     @State private var customName: String
     @State private var quantity: Double
+    @State private var quantityText: String
     @State private var discount: Double
     @State private var unitPrice: Double
-    @State private var listPrice: Double  // For display/calculation - won't modify product directly
+    @State private var listPrice: Double
+    @State private var listPriceText: String
     @State private var multiplier: Double
+    @State private var multiplierText: String
+    @State private var partnerPriceOverride: Double
+    @State private var partnerPriceText: String
     
-    // Custom formatter for decimal values
     private let numberFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.minimumFractionDigits = 2
         formatter.maximumFractionDigits = 2
+        formatter.usesGroupingSeparator = false
+        return formatter
+    }()
+    
+    private let quantityFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 0
+        formatter.usesGroupingSeparator = false
         return formatter
     }()
     
@@ -43,17 +49,44 @@ struct EditProposalItemView: View {
         
         // Initialize state with current values
         _customName = State(initialValue: item.product?.name ?? "")
-        _quantity = State(initialValue: item.quantity)
+        
+        let currentQuantity = item.quantity
+        _quantity = State(initialValue: currentQuantity)
+        _quantityText = State(initialValue: String(format: "%.0f", currentQuantity))
+        
         _discount = State(initialValue: item.discount)
         _unitPrice = State(initialValue: item.unitPrice)
-        _listPrice = State(initialValue: item.product?.listPrice ?? 0)
+        
+        // Initialize with actual product values or calculated values
+        let initialListPrice = item.product?.listPrice ?? 0
+        let initialPartnerPrice = item.product?.partnerPrice ?? 0
+        
+        // If unit price is different from default calculation, we'll calculate what the list price should have been
+        let calculatedListPrice: Double
+        if item.product?.listPrice ?? 0 > 0 {
+            let defaultUnitPrice = (item.product?.listPrice ?? 0) * (1 - item.discount / 100.0)
+            if abs(defaultUnitPrice - item.unitPrice) > 0.01 {
+                // Price has been overridden, calculate what the list price would be
+                calculatedListPrice = item.unitPrice / (1 - item.discount / 100.0)
+            } else {
+                calculatedListPrice = initialListPrice
+            }
+        } else {
+            calculatedListPrice = initialListPrice
+        }
+        
+        _listPrice = State(initialValue: calculatedListPrice)
+        _listPriceText = State(initialValue: String(format: "%.2f", calculatedListPrice))
+        
+        _partnerPriceOverride = State(initialValue: initialPartnerPrice)
+        _partnerPriceText = State(initialValue: String(format: "%.2f", initialPartnerPrice))
         
         // Calculate the multiplier from existing data
         let calculatedMultiplier: Double
-        if let product = item.product, product.listPrice > 0 {
+        if calculatedListPrice > 0 {
             let discountFactor = 1.0 - (item.discount / 100.0)
             if discountFactor > 0 {
-                calculatedMultiplier = item.unitPrice / (product.listPrice * discountFactor)
+                calculatedMultiplier = item.unitPrice / (calculatedListPrice * discountFactor)
             } else {
                 calculatedMultiplier = 1.0
             }
@@ -61,6 +94,7 @@ struct EditProposalItemView: View {
             calculatedMultiplier = 1.0
         }
         _multiplier = State(initialValue: calculatedMultiplier)
+        _multiplierText = State(initialValue: String(format: "%.2f", calculatedMultiplier))
     }
     
     // Calculated values
@@ -68,17 +102,8 @@ struct EditProposalItemView: View {
         return unitPrice * quantity
     }
     
-    var partnerPrice: Double {
-        return item.product?.partnerPrice ?? 0
-    }
-    
-    var calculatedUnitPrice: Double {
-        // Unit price can be affected by multiplier and list price
-        return listPrice * multiplier * (1 - discount/100)
-    }
-    
     var profit: Double {
-        let cost = partnerPrice * quantity
+        let cost = partnerPriceOverride * quantity
         return amount - cost
     }
     
@@ -94,204 +119,223 @@ struct EditProposalItemView: View {
             Form {
                 // PRODUCT DETAILS section
                 Section(header: Text("PRODUCT DETAILS")) {
-                    // Product name (editable for display only)
+                    // Product name (display only)
                     HStack {
                         Text("Product:")
+                            .foregroundColor(.gray)
                         Spacer()
-                        TextField("Product Name", text: $customName)
-                            .multilineTextAlignment(.trailing)
+                        Text(customName)
+                            .foregroundColor(.white)
                     }
                     
-                    // Product code (non-editable)
+                    // Product code (display only)
                     HStack {
                         Text("Code:")
+                            .foregroundColor(.gray)
                         Spacer()
                         Text(item.product?.code ?? "")
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.white)
                     }
                     
-                    // Quantity with stepper
+                    // Quantity with editable TextField and stepper buttons
                     HStack {
                         Text("Quantity:")
+                            .foregroundColor(.gray)
                         Spacer()
                         
-                        Button(action: {
-                            if quantity > 1 {
-                                quantity -= 1
+                        HStack(spacing: 12) {
+                            // Minus button
+                            Button(action: {
+                                if quantity > 1 {
+                                    quantity = floor(quantity - 1)
+                                    quantityText = String(format: "%.0f", quantity)
+                                }
+                            }) {
+                                Image(systemName: "minus.circle.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.blue)
                             }
-                        }) {
-                            Image(systemName: "minus")
-                                .padding(8)
-                                .background(Color.gray.opacity(0.2))
-                                .clipShape(Circle())
-                        }
-                        
-                        Text("\(Int(quantity))")
-                            .frame(width: 30, alignment: .center)
-                        
-                        Button(action: {
-                            quantity += 1
-                        }) {
-                            Image(systemName: "plus")
-                                .padding(8)
-                                .background(Color.gray.opacity(0.2))
-                                .clipShape(Circle())
+                            
+                            // Editable quantity field
+                            TextField("", text: $quantityText)
+                                .keyboardType(.numberPad)
+                                .multilineTextAlignment(.center)
+                                .frame(width: 60)
+                                .padding(.vertical, 8)
+                                .background(Color.white.opacity(0.1))
+                                .cornerRadius(8)
+                                .foregroundColor(.white)
+                                .onChange(of: quantityText) { newValue in
+                                    if let value = Double(newValue) {
+                                        quantity = value
+                                    }
+                                }
+                            
+                            // Plus button
+                            Button(action: {
+                                quantity = floor(quantity + 1)
+                                quantityText = String(format: "%.0f", quantity)
+                            }) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.blue)
+                            }
                         }
                     }
                     
-                    // Discount with slider
-                    VStack(alignment: .leading) {
+                    // Discount with improved slider
+                    VStack(spacing: 8) {
                         HStack {
                             Text("Discount (%)")
+                                .foregroundColor(.gray)
                             Spacer()
-                            Text("\(Int(discount))%")
+                            Text(String(format: "%.0f%%", discount))
+                                .foregroundColor(.white)
                         }
                         
-                        HStack {
-                            Circle()
-                                .frame(width: 20, height: 20)
-                                .foregroundColor(.white)
-                            
-                            Slider(value: $discount, in: 0...50)
-                                .accentColor(.blue)
+                        Slider(value: $discount, in: 0...50, step: 1.0) { _ in
+                            updateUnitPrice()
                         }
+                        .accentColor(.blue)
                     }
                 }
+                .listRowBackground(Color.gray.opacity(0.1))
                 
                 // PRICING section
                 Section(header: Text("PRICING")) {
                     // List price (editable)
                     HStack {
                         Text("List Price")
+                            .foregroundColor(.gray)
                         Spacer()
-                        TextField("List Price", value: $listPrice, formatter: NumberFormatter())
+                        TextField("", text: $listPriceText)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
+                            .frame(width: 100)
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .background(Color.white.opacity(0.1))
+                            .cornerRadius(8)
+                            .foregroundColor(.white)
+                            .onChange(of: listPriceText) { newValue in
+                                if let value = Double(newValue) {
+                                    listPrice = value
+                                    updateUnitPrice()
+                                }
+                            }
                     }
                     
-                    // Partner price (non-editable)
+                    // Partner price (editable)
                     HStack {
                         Text("Partner Price")
+                            .foregroundColor(.gray)
                         Spacer()
-                        Text(String(format: "%.2f", partnerPrice))
+                        TextField("", text: $partnerPriceText)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 100)
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .background(Color.white.opacity(0.1))
+                            .cornerRadius(8)
                             .foregroundColor(.blue)
+                            .onChange(of: partnerPriceText) { newValue in
+                                if let value = Double(newValue) {
+                                    partnerPriceOverride = value
+                                }
+                            }
                     }
                     
-                    // Multiplier (editable with better UI)
-                    VStack(alignment: .leading, spacing: 8) {
+                    // Multiplier with improved UI
+                    VStack(alignment: .leading, spacing: 12) {
                         Text("Multiplier")
+                            .foregroundColor(.gray)
                         
-                        HStack {
-                            // Decrease button
-                            Button(action: {
-                                // Decrease by 0.05 but not below 0.5
-                                multiplier = max(0.5, multiplier - 0.05)
-                                // Update unit price when multiplier changes
-                                unitPrice = listPrice * multiplier * (1 - discount/100)
-                            }) {
-                                Image(systemName: "minus")
-                                    .padding(8)
-                                    .background(Color.gray.opacity(0.2))
-                                    .clipShape(Circle())
-                            }
-                            
-                            // Direct text entry
-                            TextField("", value: $multiplier, formatter: numberFormatter)
+                        HStack(spacing: 16) {
+                            // Direct input field with better styling
+                            TextField("", text: $multiplierText)
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.center)
-                                .frame(width: 60)
-                                .padding(.vertical, 5)
-                                .background(Color.gray.opacity(0.1))
+                                .frame(width: 80)
+                                .padding(.vertical, 8)
+                                .background(Color.white.opacity(0.1))
                                 .cornerRadius(8)
-                                .onChange(of: multiplier) { newValue in
-                                    // Update unit price when multiplier changes
-                                    unitPrice = listPrice * multiplier * (1 - discount/100)
+                                .foregroundColor(.white)
+                                .onChange(of: multiplierText) { newValue in
+                                    if let value = Double(newValue) {
+                                        multiplier = value
+                                        updateUnitPrice()
+                                    }
                                 }
                             
                             Text("×")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(.secondary)
-                            
-                            // Increase button
-                            Button(action: {
-                                // Increase by 0.05 but not above 2.0
-                                multiplier = min(2.0, multiplier + 0.05)
-                                // Update unit price when multiplier changes
-                                unitPrice = listPrice * multiplier * (1 - discount/100)
-                            }) {
-                                Image(systemName: "plus")
-                                    .padding(8)
-                                    .background(Color.gray.opacity(0.2))
-                                    .clipShape(Circle())
-                            }
-                            
-                            Spacer()
+                                .font(.system(size: 18))
+                                .foregroundColor(.gray)
                         }
                         
-                        // Quick preset values
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach([0.8, 0.9, 1.0, 1.1, 1.2, 1.5], id: \.self) { value in
-                                    Button(action: {
-                                        multiplier = value
-                                        // Update unit price when multiplier changes
-                                        unitPrice = listPrice * multiplier * (1 - discount/100)
-                                    }) {
-                                        Text(String(format: "%.2f×", value))
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
-                                            .background(multiplier == value ? Color.blue : Color.gray.opacity(0.2))
-                                            .foregroundColor(multiplier == value ? .white : .primary)
-                                            .cornerRadius(8)
-                                    }
+                        // Quick preset values with better layout
+                        HStack(spacing: 8) {
+                            ForEach([0.8, 0.9, 1.0, 1.1, 1.2, 1.5], id: \.self) { value in
+                                Button(action: {
+                                    multiplier = value
+                                    multiplierText = String(format: "%.2f", value)
+                                    updateUnitPrice()
+                                }) {
+                                    Text(String(format: "%.1f×", value))
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(multiplier == value ? Color.blue : Color.gray.opacity(0.3))
+                                        .foregroundColor(.white)
+                                        .cornerRadius(8)
                                 }
                             }
                         }
                     }
                     
-                    // Unit price (editable)
+                    // Unit price (display only, calculated)
                     HStack {
                         Text("Unit Price")
+                            .foregroundColor(.gray)
                         Spacer()
-                        TextField("Unit Price", value: $unitPrice, formatter: NumberFormatter())
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                            .onChange(of: multiplier) { newValue in
-                                // Update unit price when multiplier changes
-                                unitPrice = listPrice * multiplier * (1 - discount/100)
-                            }
-                            .onChange(of: listPrice) { newValue in
-                                // Update unit price when list price changes
-                                unitPrice = listPrice * multiplier * (1 - discount/100)
-                            }
+                        Text(String(format: "%.2f", unitPrice))
+                            .foregroundColor(.white)
                     }
                     
-                    // Amount (calculated)
+                    // Amount (display only, calculated)
                     HStack {
                         Text("Amount")
+                            .foregroundColor(.gray)
                         Spacer()
                         Text(String(format: "%.2f", amount))
-                            .bold()
+                            .foregroundColor(.white)
+                            .fontWeight(.bold)
                     }
-                    
+                }
+                .listRowBackground(Color.gray.opacity(0.1))
+                
+                // PROFIT section
+                Section(header: Text("PROFIT & MARGIN")) {
                     // Profit (calculated)
                     HStack {
                         Text("Profit")
+                            .foregroundColor(.gray)
                         Spacer()
                         Text(String(format: "%.2f", profit))
                             .foregroundColor(profit > 0 ? .green : .red)
-                            .bold()
+                            .fontWeight(.bold)
                     }
                     
                     // Margin (calculated)
                     HStack {
                         Text("Margin")
+                            .foregroundColor(.gray)
                         Spacer()
                         Text(String(format: "%.1f%%", margin))
                             .foregroundColor(margin >= 20 ? .green : (margin >= 10 ? .orange : .red))
-                            .bold()
+                            .fontWeight(.bold)
                     }
                 }
+                .listRowBackground(Color.gray.opacity(0.1))
             }
             .navigationTitle("Edit Product")
             .navigationBarItems(
@@ -303,27 +347,50 @@ struct EditProposalItemView: View {
                 }
             )
         }
+        .preferredColorScheme(.dark)
+    }
+    
+    private func updateUnitPrice() {
+        // Update unit price based on list price, multiplier, and discount
+        unitPrice = listPrice * multiplier * (1 - discount/100)
     }
     
     private func saveChanges() {
+        // Ensure all text values are converted to doubles
+        if let qtyValue = Double(quantityText) {
+            quantity = qtyValue
+        }
+        if let listValue = Double(listPriceText) {
+            listPrice = listValue
+        }
+        if let partnerValue = Double(partnerPriceText) {
+            partnerPriceOverride = partnerValue
+        }
+        if let multiplierValue = Double(multiplierText) {
+            multiplier = multiplierValue
+        }
+        
         // Update fields in the proposal item
         item.quantity = quantity
         item.discount = discount
-        
-        // Calculate the final unit price based on list price, multiplier, and discount
-        unitPrice = listPrice * multiplier * (1 - discount/100)
         item.unitPrice = unitPrice
-        
-        // Calculate and set the final amount
         item.amount = amount
         
-        // DO NOT try to set multiplier directly - it's not in the Core Data model
+        // If the prices were changed, we don't modify the product itself,
+        // but we've already calculated the correct unit price above
         
         do {
+            // Save the context
             try viewContext.save()
+            
+            // Force refresh the managed object
+            viewContext.refresh(item, mergeChanges: true)
             
             // Update proposal total if available
             if let proposal = item.proposal {
+                // Force refresh the proposal as well
+                viewContext.refresh(proposal, mergeChanges: true)
+                
                 let productsTotal = proposal.subtotalProducts
                 let engineeringTotal = proposal.subtotalEngineering
                 let expensesTotal = proposal.subtotalExpenses
@@ -334,10 +401,13 @@ struct EditProposalItemView: View {
                 try viewContext.save()
             }
             
-            // Set the didSave flag to true to signal to parent view that changes were made
+            // Set the didSave flag to true
             didSave = true
             
-            presentationMode.wrappedValue.dismiss()
+            // Dismiss the view
+            DispatchQueue.main.async {
+                presentationMode.wrappedValue.dismiss()
+            }
         } catch {
             let nsError = error as NSError
             print("Error saving changes: \(nsError), \(nsError.userInfo)")

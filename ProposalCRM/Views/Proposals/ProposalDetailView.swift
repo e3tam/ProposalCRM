@@ -1,16 +1,3 @@
-//
-//  ProposalDetailView.swift
-//  ProposalCRM
-//
-//  Created by Ali Sami Gözükırmızı on 19.04.2025.
-//
-
-
-//
-//  ProposalDetailView.swift
-//  ProposalCRM
-//
-
 import SwiftUI
 import CoreData
 
@@ -34,8 +21,10 @@ struct ProposalDetailView: View {
     // Task and activity state variables
     @State private var showingAddTask = false
     @State private var showingAddComment = false
-    @State private var commentText = ""    
-    @State private var taskListRefreshTrigger = UUID()    // State variables for product item editing
+    @State private var commentText = ""
+    @State private var taskListRefreshTrigger = UUID()
+    
+    // State variables for product item editing
     @State private var itemToEdit: ProposalItem?
     @State private var showEditItemSheet = false
     @State private var didSaveItemChanges = false  // Track if changes were saved
@@ -59,633 +48,33 @@ struct ProposalDetailView: View {
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Fixed header section using a separate component with action callback
+                    // Fixed header section
                     ProposalHeaderSection(
                         proposal: proposal,
-                        onEditTapped: {
-                            showingEditProposal = true
-                        }
+                        onEditTapped: { showingEditProposal = true }
                     )
                     
                     // Content sections with proper spacing
                     VStack(alignment: .leading, spacing: 20) {
                         // PRODUCTS SECTION
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                Text("Products")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                
-                                Spacer()
-                                
-                                Button(action: { showingItemSelection = true }) {
-                                    Label("Add Products", systemImage: "plus")
-                                        .foregroundColor(.blue)
-                                }
-                            }
-                            
-                            ZStack {
-                                // Solid background
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(Color.black.opacity(0.2))
-                                
-                                VStack(spacing: 0) {
-                                    // Table header with scrollable view for all columns
-                                    ScrollView(.horizontal, showsIndicators: true) {
-                                        HStack(spacing: 0) {
-                                            // Product Name
-                                            Text("Product Name")
-                                                .font(.caption)
-                                                .fontWeight(.bold)
-                                                .frame(width: 180, alignment: .leading)
-                                                .padding(.horizontal, 5)
-                                            
-                                            Divider().frame(height: 36)
-                                            
-                                            // Qty
-                                            Text("Qty")
-                                                .font(.caption)
-                                                .fontWeight(.bold)
-                                                .frame(width: 50, alignment: .center)
-                                                .padding(.horizontal, 5)
-                                            
-                                            Divider().frame(height: 36)
-                                            
-                                            // Unit Partner Price
-                                            Text("Unit Partner Price")
-                                                .font(.caption)
-                                                .fontWeight(.bold)
-                                                .frame(width: 120, alignment: .trailing)
-                                                .padding(.horizontal, 5)
-                                            
-                                            Divider().frame(height: 36)
-                                            
-                                            // Unit List Price
-                                            Text("Unit List Price")
-                                                .font(.caption)
-                                                .fontWeight(.bold)
-                                                .frame(width: 120, alignment: .trailing)
-                                                .padding(.horizontal, 5)
-                                            
-                                            Divider().frame(height: 36)
-                                            
-                                            // Multiplier
-                                            Text("Multiplier")
-                                                .font(.caption)
-                                                .fontWeight(.bold)
-                                                .frame(width: 80, alignment: .center)
-                                                .padding(.horizontal, 5)
-                                            
-                                            Divider().frame(height: 36)
-                                            
-                                            // Discount
-                                            Text("Discount")
-                                                .font(.caption)
-                                                .fontWeight(.bold)
-                                                .frame(width: 80, alignment: .center)
-                                                .padding(.horizontal, 5)
-                                            
-                                            Divider().frame(height: 36)
-                                            
-                                            // Ext Partner Price
-                                            Text("Ext Partner Price")
-                                                .font(.caption)
-                                                .fontWeight(.bold)
-                                                .frame(width: 120, alignment: .trailing)
-                                                .padding(.horizontal, 5)
-                                            
-                                            Divider().frame(height: 36)
-                                            
-                                            // Ext List Price
-                                            Text("Ext List Price")
-                                                .font(.caption)
-                                                .fontWeight(.bold)
-                                                .frame(width: 120, alignment: .trailing)
-                                                .padding(.horizontal, 5)
-                                            
-                                            Divider().frame(height: 36)
-                                            
-                                            // Ext Customer Price
-                                            Text("Ext Customer Price")
-                                                .font(.caption)
-                                                .fontWeight(.bold)
-                                                .frame(width: 120, alignment: .trailing)
-                                                .padding(.horizontal, 5)
-                                            
-                                            Divider().frame(height: 36)
-                                            
-                                            // Total Profit
-                                            Text("Total Profit")
-                                                .font(.caption)
-                                                .fontWeight(.bold)
-                                                .frame(width: 100, alignment: .trailing)
-                                                .padding(.horizontal, 5)
-                                            
-                                            Divider().frame(height: 36)
-                                            
-                                            // Custom Tax?
-                                            Text("Custom Tax?")
-                                                .font(.caption)
-                                                .fontWeight(.bold)
-                                                .frame(width: 90, alignment: .center)
-                                                .padding(.horizontal, 5)
-                                            
-                                            Divider().frame(height: 36)
-                                            
-                                            // Actions
-                                            Text("Act")
-                                                .font(.caption)
-                                                .fontWeight(.bold)
-                                                .frame(width: 60, alignment: .center)
-                                                .padding(.horizontal, 5)
-                                        }
-                                        .padding(.vertical, 10)
-                                        .background(Color.black.opacity(0.3))
-                                    }
-                                    
-                                    Divider().background(Color.gray)
-                                    
-                                    // Main table content with rows
-                                    if proposal.itemsArray.isEmpty {
-                                        Text("No products added yet")
-                                            .foregroundColor(.gray)
-                                            .padding()
-                                            .frame(maxWidth: .infinity)
-                                    } else {
-                                        ScrollView {
-                                            VStack(spacing: 0) {
-                                                ForEach(proposal.itemsArray, id: \.self) { item in
-                                                    ScrollView(.horizontal, showsIndicators: true) {
-                                                        HStack(spacing: 0) {
-                                                            // Product Name with code
-                                                            VStack(alignment: .leading, spacing: 2) {
-                                                                Text(item.productName)
-                                                                    .font(.system(size: 14))
-                                                                    .foregroundColor(.white)
-                                                                Text(item.productCode)
-                                                                    .font(.system(size: 12))
-                                                                    .foregroundColor(.gray)
-                                                            }
-                                                            .frame(width: 180, alignment: .leading)
-                                                            .padding(.horizontal, 5)
-                                                            
-                                                            Divider().frame(height: 40)
-                                                            
-                                                            // Quantity
-                                                            Text("\(Int(item.quantity))")
-                                                                .font(.system(size: 14))
-                                                                .frame(width: 50, alignment: .center)
-                                                                .padding(.horizontal, 5)
-                                                            
-                                                            Divider().frame(height: 40)
-                                                            
-                                                            // Unit Partner Price
-                                                            let partnerPrice = item.product?.partnerPrice ?? 0
-                                                            Text(String(format: "%.2f", partnerPrice))
-                                                                .font(.system(size: 14))
-                                                                .frame(width: 120, alignment: .trailing)
-                                                                .padding(.horizontal, 5)
-                                                            
-                                                            Divider().frame(height: 40)
-                                                            
-                                                            // Unit List Price
-                                                            let listPrice = item.product?.listPrice ?? 0
-                                                            Text(String(format: "%.2f", listPrice))
-                                                                .font(.system(size: 14))
-                                                                .frame(width: 120, alignment: .trailing)
-                                                                .padding(.horizontal, 5)
-                                                            
-                                                            Divider().frame(height: 40)
-                                                            
-                                                            // Multiplier (calculated from price data)
-                                                            Text(String(format: "%.2f", calculateMultiplier(item)))
-                                                                .font(.system(size: 14))
-                                                                .frame(width: 80, alignment: .center)
-                                                                .padding(.horizontal, 5)
-                                                            
-                                                            Divider().frame(height: 40)
-                                                            
-                                                            // Discount
-                                                            Text(String(format: "%.1f%%", item.discount))
-                                                                .font(.system(size: 14))
-                                                                .frame(width: 80, alignment: .center)
-                                                                .padding(.horizontal, 5)
-                                                            
-                                                            Divider().frame(height: 40)
-                                                            
-                                                            // Ext Partner Price
-                                                            let extPartnerPrice = partnerPrice * item.quantity
-                                                            Text(String(format: "%.2f", extPartnerPrice))
-                                                                .font(.system(size: 14))
-                                                                .frame(width: 120, alignment: .trailing)
-                                                                .padding(.horizontal, 5)
-                                                            
-                                                            Divider().frame(height: 40)
-                                                            
-                                                            // Ext List Price
-                                                            let extListPrice = listPrice * item.quantity
-                                                            Text(String(format: "%.2f", extListPrice))
-                                                                .font(.system(size: 14))
-                                                                .frame(width: 120, alignment: .trailing)
-                                                                .padding(.horizontal, 5)
-                                                            
-                                                            Divider().frame(height: 40)
-                                                            
-                                                            // Ext Customer Price (amount)
-                                                            Text(String(format: "%.2f", item.amount))
-                                                                .font(.system(size: 14))
-                                                                .frame(width: 120, alignment: .trailing)
-                                                                .padding(.horizontal, 5)
-                                                            
-                                                            Divider().frame(height: 40)
-                                                            
-                                                            // Total Profit
-                                                            let profit = item.amount - extPartnerPrice
-                                                            Text(String(format: "%.2f", profit))
-                                                                .font(.system(size: 14))
-                                                                .foregroundColor(profit > 0 ? .green : .red)
-                                                                .frame(width: 100, alignment: .trailing)
-                                                                .padding(.horizontal, 5)
-                                                            
-                                                            Divider().frame(height: 40)
-                                                            
-                                                            // Custom Tax?
-                                                            Text("No")
-                                                                .font(.system(size: 14))
-                                                                .frame(width: 90, alignment: .center)
-                                                                .padding(.horizontal, 5)
-                                                            
-                                                            Divider().frame(height: 40)
-                                                            
-                                                            // Action buttons
-                                                            HStack(spacing: 15) {
-                                                                Button(action: {
-                                                                    itemToEdit = item
-                                                                    showEditItemSheet = true
-                                                                }) {
-                                                                    Image(systemName: "pencil")
-                                                                        .foregroundColor(.blue)
-                                                                }
-                                                                
-                                                                Button(action: {
-                                                                    itemToDelete = item
-                                                                    showDeleteConfirmation = true
-                                                                }) {
-                                                                    Image(systemName: "trash")
-                                                                        .foregroundColor(.red)
-                                                                }
-                                                            }
-                                                            .frame(width: 60, alignment: .center)
-                                                        }
-                                                        .padding(.vertical, 8)
-                                                    }
-                                                    .background(Color.black.opacity(0.2))
-                                                    
-                                                    Divider().background(Color.gray.opacity(0.5))
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
+                        productsSection
                         
                         // ENGINEERING SECTION
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                Text("Engineering")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                
-                                if proposal.engineeringArray.count > 0 {
-                                    Text("(\(proposal.engineeringArray.count))")
-                                        .font(.subheadline)
-                                        .foregroundColor(.gray)
-                                }
-                                
-                                Spacer()
-                                
-                                Button(action: { showingEngineeringForm = true }) {
-                                    Label("Add", systemImage: "plus")
-                                        .foregroundColor(.blue)
-                                }
-                            }
-                            
-                            ZStack {
-                                // Solid background
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(Color.black.opacity(0.2))
-                                
-                                // Table content
-                                VStack(spacing: 0) {
-                                    // Header
-                                    HStack {
-                                        Text("Description")
-                                            .font(.caption)
-                                            .fontWeight(.bold)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                        
-                                        Text("Days")
-                                            .font(.caption)
-                                            .fontWeight(.bold)
-                                            .frame(width: 60, alignment: .center)
-                                        
-                                        Text("Rate")
-                                            .font(.caption)
-                                            .fontWeight(.bold)
-                                            .frame(width: 80, alignment: .trailing)
-                                        
-                                        Text("Amount")
-                                            .font(.caption)
-                                            .fontWeight(.bold)
-                                            .frame(width: 100, alignment: .trailing)
-                                        
-                                        Text("Act")
-                                            .font(.caption)
-                                            .fontWeight(.bold)
-                                            .frame(width: 60, alignment: .center)
-                                    }
-                                    .padding(.horizontal)
-                                    .padding(.vertical, 8)
-                                    .background(Color.black.opacity(0.3))
-                                    
-                                    Divider().background(Color.gray)
-                                    
-                                    // Engineering rows or empty state
-                                    if proposal.engineeringArray.isEmpty {
-                                        Text("No engineering services added yet")
-                                            .foregroundColor(.gray)
-                                            .padding()
-                                            .frame(maxWidth: .infinity)
-                                    } else {
-                                        ForEach(proposal.engineeringArray, id: \.self) { engineering in
-                                            HStack {
-                                                Text(engineering.desc ?? "")
-                                                    .font(.subheadline)
-                                                    .foregroundColor(.white)
-                                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                                
-                                                Text(String(format: "%.1f", engineering.days))
-                                                    .font(.subheadline)
-                                                    .frame(width: 60, alignment: .center)
-                                                
-                                                Text(String(format: "%.2f", engineering.rate))
-                                                    .font(.subheadline)
-                                                    .frame(width: 80, alignment: .trailing)
-                                                
-                                                Text(String(format: "%.2f", engineering.amount))
-                                                    .font(.subheadline)
-                                                    .fontWeight(.semibold)
-                                                    .foregroundColor(.white)
-                                                    .frame(width: 100, alignment: .trailing)
-                                                
-                                                HStack(spacing: 15) {
-                                                    Button(action: {
-                                                        engineeringToEdit = engineering
-                                                        showEditEngineeringSheet = true
-                                                    }) {
-                                                        Image(systemName: "pencil")
-                                                            .foregroundColor(.blue)
-                                                    }
-                                                    
-                                                    Button(action: {
-                                                        deleteEngineering(engineering)
-                                                    }) {
-                                                        Image(systemName: "trash")
-                                                            .foregroundColor(.red)
-                                                    }
-                                                }
-                                                .frame(width: 60, alignment: .center)
-                                            }
-                                            .padding(.horizontal)
-                                            .padding(.vertical, 8)
-                                            .background(Color.black.opacity(0.1))
-                                            
-                                            Divider().background(Color.gray.opacity(0.3))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
+                        engineeringSection
                         
                         // EXPENSES SECTION
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                Text("Expenses")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                
-                                if proposal.expensesArray.count > 0 {
-                                    Text("(\(proposal.expensesArray.count))")
-                                        .font(.subheadline)
-                                        .foregroundColor(.gray)
-                                }
-                                
-                                Spacer()
-                                
-                                Button(action: { showingExpensesForm = true }) {
-                                    Label("Add", systemImage: "plus")
-                                        .foregroundColor(.blue)
-                                }
-                            }
-                            
-                            ZStack {
-                                // Solid background
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(Color.black.opacity(0.2))
-                                
-                                // Table content
-                                VStack(spacing: 0) {
-                                    // Header
-                                    HStack {
-                                        Text("Description")
-                                            .font(.caption)
-                                            .fontWeight(.bold)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                        
-                                        Text("Amount")
-                                            .font(.caption)
-                                            .fontWeight(.bold)
-                                            .frame(width: 100, alignment: .trailing)
-                                        
-                                        Text("Act")
-                                            .font(.caption)
-                                            .fontWeight(.bold)
-                                            .frame(width: 60, alignment: .center)
-                                    }
-                                    .padding(.horizontal)
-                                    .padding(.vertical, 8)
-                                    .background(Color.black.opacity(0.3))
-                                    
-                                    Divider().background(Color.gray)
-                                    
-                                    // Expense rows or empty state
-                                    if proposal.expensesArray.isEmpty {
-                                        Text("No expenses added yet")
-                                            .foregroundColor(.gray)
-                                            .padding()
-                                            .frame(maxWidth: .infinity)
-                                    } else {
-                                        ForEach(proposal.expensesArray, id: \.self) { expense in
-                                            HStack {
-                                                Text(expense.desc ?? "")
-                                                    .font(.subheadline)
-                                                    .foregroundColor(.white)
-                                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                                
-                                                Text(String(format: "%.2f", expense.amount))
-                                                    .font(.subheadline)
-                                                    .fontWeight(.semibold)
-                                                    .foregroundColor(.white)
-                                                    .frame(width: 100, alignment: .trailing)
-                                                
-                                                HStack(spacing: 15) {
-                                                    Button(action: {
-                                                        expenseToEdit = expense
-                                                        showEditExpenseSheet = true
-                                                    }) {
-                                                        Image(systemName: "pencil")
-                                                            .foregroundColor(.blue)
-                                                    }
-                                                    
-                                                    Button(action: {
-                                                        deleteExpense(expense)
-                                                    }) {
-                                                        Image(systemName: "trash")
-                                                            .foregroundColor(.red)
-                                                    }
-                                                }
-                                                .frame(width: 60, alignment: .center)
-                                            }
-                                            .padding(.horizontal)
-                                            .padding(.vertical, 8)
-                                            .background(Color.black.opacity(0.1))
-                                            
-                                            Divider().background(Color.gray.opacity(0.3))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
+                        expensesSection
                         
                         // CUSTOM TAXES SECTION
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                Text("Custom Taxes")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                
-                                Spacer()
-                                
-                                Button(action: { showingCustomTaxForm = true }) {
-                                    Label("Add", systemImage: "plus")
-                                        .foregroundColor(.blue)
-                                }
-                            }
-                            
-                            ZStack {
-                                // Solid background
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(Color.black.opacity(0.2))
-                                
-                                // Table content
-                                VStack(spacing: 0) {
-                                    // Header
-                                    HStack {
-                                        Text("Tax Name")
-                                            .font(.caption)
-                                            .fontWeight(.bold)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                        
-                                        Text("Rate")
-                                            .font(.caption)
-                                            .fontWeight(.bold)
-                                            .frame(width: 80, alignment: .trailing)
-                                        
-                                        Text("Amount")
-                                            .font(.caption)
-                                            .fontWeight(.bold)
-                                            .frame(width: 100, alignment: .trailing)
-                                        
-                                        Text("Act")
-                                            .font(.caption)
-                                            .fontWeight(.bold)
-                                            .frame(width: 60, alignment: .center)
-                                    }
-                                    .padding(.horizontal)
-                                    .padding(.vertical, 8)
-                                    .background(Color.black.opacity(0.3))
-                                    
-                                    Divider().background(Color.gray)
-                                    
-                                    // Custom tax rows or empty state
-                                    if proposal.taxesArray.isEmpty {
-                                        Text("No custom taxes added yet")
-                                            .foregroundColor(.gray)
-                                            .padding()
-                                            .frame(maxWidth: .infinity)
-                                    } else {
-                                        ForEach(proposal.taxesArray, id: \.self) { tax in
-                                            HStack {
-                                                Text(tax.name ?? "")
-                                                    .font(.subheadline)
-                                                    .foregroundColor(.white)
-                                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                                
-                                                Text(String(format: "%.1f%%", tax.rate))
-                                                    .font(.subheadline)
-                                                    .frame(width: 80, alignment: .trailing)
-                                                
-                                                Text(String(format: "%.2f", tax.amount))
-                                                    .font(.subheadline)
-                                                    .fontWeight(.semibold)
-                                                    .foregroundColor(.white)
-                                                    .frame(width: 100, alignment: .trailing)
-                                                
-                                                HStack(spacing: 15) {
-                                                    Button(action: {
-                                                        taxToEdit = tax
-                                                        showEditTaxSheet = true
-                                                    }) {
-                                                        Image(systemName: "pencil")
-                                                            .foregroundColor(.blue)
-                                                    }
-                                                    
-                                                    Button(action: {
-                                                        deleteTax(tax)
-                                                    }) {
-                                                        Image(systemName: "trash")
-                                                            .foregroundColor(.red)
-                                                    }
-                                                }
-                                                .frame(width: 60, alignment: .center)
-                                            }
-                                            .padding(.horizontal)
-                                            .padding(.vertical, 8)
-                                            .background(Color.black.opacity(0.1))
-                                            
-                                            Divider().background(Color.gray.opacity(0.3))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
+                        customTaxesSection
                         
                         // FINANCIAL SUMMARY SECTION
                         financialSummarySection
                         
-                        // TASK SECTION - IMPORTANT NEW ADDITION
+                        // TASK SECTION
                         taskSummarySection
                         
-                        // ACTIVITY SECTION - IMPORTANT NEW ADDITION
+                        // ACTIVITY SECTION
                         activitySummarySection
                         
                         // NOTES SECTION
@@ -765,10 +154,22 @@ struct ProposalDetailView: View {
                             // Reset the flag
                             didSaveItemChanges = false
                             
+                            // Force Core Data to refresh all relevant objects
+                            viewContext.refresh(proposal, mergeChanges: true)
+                            for proposalItem in proposal.itemsArray {
+                                viewContext.refresh(proposalItem, mergeChanges: true)
+                            }
+                            
                             // Force UI refresh by triggering state change
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                // Just update any state variable to trigger refresh
+                                viewContext.refreshAllObjects()
+                                // Clear the edit state to force SwiftUI to update
+                                itemToEdit = nil
                                 showEditItemSheet = false
+                                // Trigger another refresh to be sure
+                                withAnimation {
+                                    taskListRefreshTrigger = UUID()  // This will force a view update
+                                }
                             }
                         }
                     }
@@ -777,13 +178,8 @@ struct ProposalDetailView: View {
         // TASK PRESENTATION SHEET
         .sheet(isPresented: $showingAddTask, onDismiss: {
             print("DEBUG: Add Task sheet dismissed")
-            
-            // Force refresh the task list
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                print("DEBUG: Refreshing task list after sheet dismissal")
                 self.taskListRefreshTrigger = UUID()
-                
-                // For very stubborn cases, try explicitly refreshing the Core Data fetch
                 let context = PersistenceController.shared.container.viewContext
                 context.refreshAllObjects()
             }
@@ -794,7 +190,6 @@ struct ProposalDetailView: View {
         // COMMENT ALERT
         .alert("Add Comment", isPresented: $showingAddComment) {
             TextField("Comment", text: $commentText)
-            
             Button("Cancel", role: .cancel) { }
             Button("Save") {
                 if !commentText.isEmpty {
@@ -817,237 +212,332 @@ struct ProposalDetailView: View {
         }
     }
     
-    // MARK: - Task Summary Section
-    private var taskSummarySection: some View {
+    // MARK: - Products Section with Fixed Table Headers
+    private var productsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // This forces view refresh when tasks change
-            let _ = taskListRefreshTrigger
-            
             HStack {
-                Text("Tasks")
+                Text("Products")
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(.white)
                 
-                if proposal.tasksArray.count > 0 {
-                    Text("(\(proposal.tasksArray.count))")
+                Spacer()
+                
+                Button(action: { showingItemSelection = true }) {
+                    Label("Add Products", systemImage: "plus")
+                        .foregroundColor(.blue)
+                }
+            }
+            
+            if proposal.itemsArray.isEmpty {
+                Text("No products added yet")
+                    .foregroundColor(.gray)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.black.opacity(0.2))
+                    .cornerRadius(10)
+            } else {
+                // Product table with fixed header alignment
+                VStack(spacing: 0) {
+                    // Table header row - Fixed alignment
+                    HStack(spacing: 0) {
+                        TableHeaderCell(title: "Product Name", width: 180, alignment: .leading)
+                        TableHeaderCell(title: "Qty", width: 50, alignment: .center)
+                        TableHeaderCell(title: "Unit Partner Price", width: 120, alignment: .trailing)
+                        TableHeaderCell(title: "Unit List Price", width: 120, alignment: .trailing)
+                        TableHeaderCell(title: "Multiplier", width: 80, alignment: .center)
+                        TableHeaderCell(title: "Discount", width: 80, alignment: .center)
+                        TableHeaderCell(title: "Ext Partner Price", width: 120, alignment: .trailing)
+                        TableHeaderCell(title: "Ext List Price", width: 120, alignment: .trailing)
+                        TableHeaderCell(title: "Ext Customer Price", width: 120, alignment: .trailing)
+                        TableHeaderCell(title: "Total Profit", width: 100, alignment: .trailing)
+                        TableHeaderCell(title: "Custom Tax?", width: 90, alignment: .center)
+                        TableHeaderCell(title: "Act", width: 60, alignment: .center, isLast: true)
+                    }
+                    .frame(height: 40)
+                    .background(Color.black.opacity(0.3))
+                    
+                    Divider().background(Color.gray.opacity(0.5))
+                    
+                    // Data rows
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            ForEach(proposal.itemsArray, id: \.self) { item in
+                                HStack(spacing: 0) {
+                                    // Product Name and code
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(item.productName)
+                                            .font(.system(size: 14))
+                                            .foregroundColor(.white)
+                                        Text(item.productCode)
+                                            .font(.system(size: 12))
+                                            .foregroundColor(.gray)
+                                    }
+                                    .frame(width: 180, alignment: .leading)
+                                    .padding(.horizontal, 5)
+                                    
+                                    TableDivider()
+                                    
+                                    // Quantity
+                                    Text("\(Int(item.quantity))")
+                                        .font(.system(size: 14))
+                                        .frame(width: 50, alignment: .center)
+                                        .padding(.horizontal, 5)
+                                    
+                                    TableDivider()
+                                    
+                                    // Unit Partner Price (use overridden value if exists)
+                                    let partnerPrice = getPartnerPrice(for: item)
+                                    Text(String(format: "%.2f", partnerPrice))
+                                        .font(.system(size: 14))
+                                        .frame(width: 120, alignment: .trailing)
+                                        .padding(.horizontal, 5)
+                                    
+                                    TableDivider()
+                                    
+                                    // Unit List Price (use overridden value if exists)
+                                    let listPrice = getListPrice(for: item)
+                                    Text(String(format: "%.2f", listPrice))
+                                        .font(.system(size: 14))
+                                        .frame(width: 120, alignment: .trailing)
+                                        .padding(.horizontal, 5)
+                                    
+                                    TableDivider()
+                                    
+                                    // Multiplier
+                                    Text(String(format: "%.2f", calculateMultiplier(item)))
+                                        .font(.system(size: 14))
+                                        .frame(width: 80, alignment: .center)
+                                        .padding(.horizontal, 5)
+                                    
+                                    TableDivider()
+                                    
+                                    // Discount
+                                    Text(String(format: "%.1f%%", item.discount))
+                                        .font(.system(size: 14))
+                                        .frame(width: 80, alignment: .center)
+                                        .padding(.horizontal, 5)
+                                    
+                                    TableDivider()
+                                    
+                                    // Extended Partner Price
+                                    let extPartnerPrice = partnerPrice * item.quantity
+                                    Text(String(format: "%.2f", extPartnerPrice))
+                                        .font(.system(size: 14))
+                                        .frame(width: 120, alignment: .trailing)
+                                        .padding(.horizontal, 5)
+                                    
+                                    TableDivider()
+                                    
+                                    // Extended List Price
+                                    let extListPrice = listPrice * item.quantity
+                                    Text(String(format: "%.2f", extListPrice))
+                                        .font(.system(size: 14))
+                                        .frame(width: 120, alignment: .trailing)
+                                        .padding(.horizontal, 5)
+                                    
+                                    TableDivider()
+                                    
+                                    // Extended Customer Price
+                                    Text(String(format: "%.2f", item.amount))
+                                        .font(.system(size: 14))
+                                        .frame(width: 120, alignment: .trailing)
+                                        .padding(.horizontal, 5)
+                                    
+                                    TableDivider()
+                                    
+                                    // Total Profit
+                                    let profit = item.amount - extPartnerPrice
+                                    Text(String(format: "%.2f", profit))
+                                        .font(.system(size: 14))
+                                        .foregroundColor(profit > 0 ? .green : .red)
+                                        .frame(width: 100, alignment: .trailing)
+                                        .padding(.horizontal, 5)
+                                    
+                                    TableDivider()
+                                    
+                                    // Custom Tax?
+                                    Text("No")
+                                        .font(.system(size: 14))
+                                        .frame(width: 90, alignment: .center)
+                                        .padding(.horizontal, 5)
+                                    
+                                    TableDivider()
+                                    
+                                    // Action buttons
+                                    HStack(spacing: 15) {
+                                        Button(action: {
+                                            itemToEdit = item
+                                            showEditItemSheet = true
+                                        }) {
+                                            Image(systemName: "pencil")
+                                                .foregroundColor(.blue)
+                                        }
+                                        
+                                        Button(action: {
+                                            itemToDelete = item
+                                            showDeleteConfirmation = true
+                                        }) {
+                                            Image(systemName: "trash")
+                                                .foregroundColor(.red)
+                                        }
+                                    }
+                                    .frame(width: 60, alignment: .center)
+                                }
+                                .padding(.vertical, 8)
+                                .background(Color.black.opacity(0.2))
+                                
+                                Divider().background(Color.gray.opacity(0.5))
+                            }
+                        }
+                    }
+                }
+                .background(Color.black.opacity(0.1))
+                .cornerRadius(10)
+            }
+        }
+        .padding(.horizontal)
+    }
+    
+    // MARK: - Fixed Table Header Components
+    private struct TableHeaderCell: View {
+        let title: String
+        let width: CGFloat
+        let alignment: Alignment
+        var isLast: Bool = false
+        
+        var body: some View {
+            Text(title)
+                .font(.caption)
+                .fontWeight(.bold)
+                .frame(width: width, height: 40, alignment: alignment)
+                .padding(.horizontal, 5)
+                .background(Color.clear)
+                .overlay(
+                    Rectangle()
+                        .frame(width: 1, height: 30)
+                        .foregroundColor(Color.gray.opacity(0.5)),
+                    alignment: .trailing
+                )
+                .opacity(isLast ? 0 : 1)
+        }
+    }
+    
+    private struct TableDivider: View {
+        var body: some View {
+            Rectangle()
+                .fill(Color.gray.opacity(0.5))
+                .frame(width: 1, height: 30)
+        }
+    }
+    
+    // MARK: - Engineering Section
+    private var engineeringSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Engineering")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                
+                if !proposal.engineeringArray.isEmpty {
+                    Text("(\(proposal.engineeringArray.count))")
                         .font(.subheadline)
                         .foregroundColor(.gray)
                 }
                 
                 Spacer()
                 
-                Button(action: {
-                    print("DEBUG: Add Task button tapped")
-                    showingAddTask = true
-                }) {
+                Button(action: { showingEngineeringForm = true }) {
                     Label("Add", systemImage: "plus")
                         .foregroundColor(.blue)
                 }
             }
             
-            // For debugging, add this temporarily
-            Text("DEBUG: Task count: \(proposal.tasksArray.count)")
-                .font(.caption)
-                .foregroundColor(.yellow)
-                .padding(4)
-                .background(Color.black)
-                .cornerRadius(4)
-            
-            if proposal.tasksArray.isEmpty {
-                Text("No tasks created yet")
-                    .foregroundColor(.gray)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color.black.opacity(0.2))
-                    .cornerRadius(10)
-            } else {
-                ZStack {
-                    // Solid background
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.black.opacity(0.2))
-                    
-                    VStack(spacing: 0) {
-                        // Task list
-                        ForEach(proposal.tasksArray.prefix(5), id: \.self) { task in
-                            NavigationLink(destination: TaskDetailView(task: task)) {
-                                HStack {
-                                    Circle()
-                                        .fill(task.statusColor)
-                                        .frame(width: 12, height: 12)
-                                    
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(task.title ?? "")
-                                            .font(.subheadline)
-                                            .foregroundColor(.white)
-                                            .strikethrough(task.status == "Completed")
-                                        
-                                        HStack {
-                                            Circle()
-                                                .fill(task.priorityColor)
-                                                .frame(width: 8, height: 8)
-                                            
-                                            Text(task.priority ?? "")
-                                                .font(.caption)
-                                                .foregroundColor(.gray)
-                                            
-                                            if let dueDate = task.dueDate {
-                                                Text("•")
-                                                    .foregroundColor(.gray)
-                                                
-                                                Text(dueDate, style: .date)
-                                                    .font(.caption)
-                                                    .foregroundColor(task.isOverdue ? .red : .gray)
-                                            }
-                                            
-                                            if task.isOverdue {
-                                                Text("OVERDUE")
-                                                    .font(.caption)
-                                                    .padding(2)
-                                                    .background(Color.red)
-                                                    .foregroundColor(.white)
-                                                    .cornerRadius(4)
-                                            }
-                                        }
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
-                                        .font(.caption)
-                                }
-                                .padding(.vertical, 8)
-                                .padding(.horizontal)
-                                .background(Color.black.opacity(0.1))
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            Divider()
-                                .background(Color.gray.opacity(0.3))
-                        }
-                        
-                        // Show more button if needed
-                        if proposal.tasksArray.count > 5 {
-                            NavigationLink(destination: TaskListViewForProposal(proposal: proposal)) {
-                                Text("View All \(proposal.tasksArray.count) Tasks")
-                                    .fontWeight(.semibold)
-                                    .padding(.vertical, 10)
-                                    .frame(maxWidth: .infinity)
-                                    .background(Color.blue.opacity(0.2))
-                                    .foregroundColor(.blue)
-                            }
-                        }
-                    }
+            EngineeringTableView(
+                proposal,
+                onDelete: { engineering in
+                    deleteEngineering(engineering)
+                },
+                onEdit: { engineering in
+                    engineeringToEdit = engineering
+                    showEditEngineeringSheet = true
                 }
-            }
+            )
         }
         .padding(.horizontal)
-        .onAppear {
-            print("DEBUG: Task summary section appeared, task count: \(proposal.tasksArray.count)")
-            print("DEBUG: Proposal ID: \(proposal.id?.uuidString ?? "unknown")")
-            
-            // Diagnostic: Try to fetch tasks directly
-            let fetchRequest: NSFetchRequest<Task> = Task.fetchRequest()
-            fetchRequest.predicate = NSPredicate(format: "proposal.id == %@", proposal.id! as CVarArg)
-            
-            do {
-                let fetchedTasks = try viewContext.fetch(fetchRequest)
-                print("DEBUG: Directly fetched tasks count: \(fetchedTasks.count)")
-                for task in fetchedTasks {
-                    print("DEBUG: Task ID: \(task.id?.uuidString ?? "unknown"), Title: \(task.title ?? "no title")")
-                }
-            } catch {
-                print("DEBUG: Error fetching tasks directly: \(error)")
-            }
-        }
     }
     
-    // MARK: - Activity Summary Section
-    private var activitySummarySection: some View {
+    // MARK: - Expenses Section
+    private var expensesSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Recent Activity")
+                Text("Expenses")
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(.white)
                 
+                if !proposal.expensesArray.isEmpty {
+                    Text("(\(proposal.expensesArray.count))")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                }
+                
                 Spacer()
                 
-                HStack(spacing: 15) {
-                    Button(action: { showingAddComment = true }) {
-                        Label("Add Comment", systemImage: "text.bubble")
-                            .foregroundColor(.blue)
-                    }
-                    
-                    NavigationLink(destination: ActivityDetailView(proposal: proposal)) {
-                        Label("View All", systemImage: "list.bullet")
-                            .foregroundColor(.blue)
-                    }
+                Button(action: { showingExpensesForm = true }) {
+                    Label("Add", systemImage: "plus")
+                        .foregroundColor(.blue)
                 }
             }
             
-            if proposal.activitiesArray.isEmpty {
-                Text("No activity recorded yet")
-                    .foregroundColor(.gray)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color.black.opacity(0.2))
-                    .cornerRadius(10)
-            } else {
-                ZStack {
-                    // Solid background
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.black.opacity(0.2))
-                    
-                    VStack(alignment: .leading, spacing: 0) {
-                        // Only show the 5 most recent activities
-                        ForEach(proposal.activitiesArray.prefix(5), id: \.self) { activity in
-                            HStack(spacing: 12) {
-                                // Timeline dot and line
-                                VStack(spacing: 0) {
-                                    Circle()
-                                        .fill(activity.typeColor)
-                                        .frame(width: 10, height: 10)
-                                    
-                                    if activity != proposal.activitiesArray.prefix(5).last {
-                                        Rectangle()
-                                            .fill(Color.gray.opacity(0.5))
-                                            .frame(width: 2)
-                                    }
-                                }
-                                .frame(height: 50)
-                                
-                                // Activity summary
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(activity.description ?? "")
-                                        .font(.subheadline)
-                                        .foregroundColor(.white)
-                                    
-                                    Text(activity.formattedTimestamp)
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                }
-                                
-                                Spacer()
-                            }
-                            .padding(.horizontal)
-                        }
-                        
-                        if proposal.activitiesArray.count > 5 {
-                            NavigationLink(destination: ActivityDetailView(proposal: proposal)) {
-                                Text("View All Activity")
-                                    .fontWeight(.semibold)
-                                    .padding(.vertical, 10)
-                                    .frame(maxWidth: .infinity)
-                                    .background(Color.blue.opacity(0.2))
-                                    .foregroundColor(.blue)
-                            }
-                        }
-                    }
-                    .padding(.vertical, 8)
+            ExpensesTableView(
+                proposal,
+                onDelete: { expense in
+                    deleteExpense(expense)
+                },
+                onEdit: { expense in
+                    expenseToEdit = expense
+                    showEditExpenseSheet = true
+                }
+            )
+        }
+        .padding(.horizontal)
+    }
+    
+    // MARK: - Custom Taxes Section
+    private var customTaxesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Custom Taxes")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                
+                if !proposal.taxesArray.isEmpty {
+                    Text("(\(proposal.taxesArray.count))")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                }
+                
+                Spacer()
+                
+                Button(action: { showingCustomTaxForm = true }) {
+                    Label("Add", systemImage: "plus")
+                        .foregroundColor(.blue)
                 }
             }
+            
+            CustomTaxesTableView(
+                proposal,
+                onDelete: { tax in
+                    deleteTax(tax)
+                },
+                onEdit: { tax in
+                    taxToEdit = tax
+                    showEditTaxSheet = true
+                }
+            )
         }
         .padding(.horizontal)
     }
@@ -1055,7 +545,6 @@ struct ProposalDetailView: View {
     // MARK: - Financial Summary Section
     private var financialSummarySection: some View {
         ZStack {
-            // Solid background
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color.black.opacity(0.2))
             
@@ -1143,63 +632,69 @@ struct ProposalDetailView: View {
         .padding(.horizontal)
     }
     
-    // MARK: - Helper method to calculate multiplier value
-    private func calculateMultiplier(_ item: ProposalItem) -> Double {
-        if let product = item.product, product.listPrice > 0 {
-            let discountFactor = 1.0 - (item.discount / 100.0)
-            if discountFactor > 0 {
-                return item.unitPrice / (product.listPrice * discountFactor)
-            }
-        }
-        return 1.0 // Default value
-    }
-    
-    // MARK: - Helper functions and structures
-    private func logStatusChange(oldStatus: String, newStatus: String) {
-        ActivityLogger.logStatusChanged(
-            proposal: proposal,
-            context: viewContext,
-            oldStatus: oldStatus,
-            newStatus: newStatus
-        )
-    }
-
-    private func logProposalEdit(fieldChanged: String) {
-        ActivityLogger.logProposalUpdated(
-            proposal: proposal,
-            context: viewContext,
-            fieldChanged: fieldChanged
-        )
-    }
-    
-    private func addComment() {
-        ActivityLogger.logCommentAdded(
-            proposal: proposal,
-            context: viewContext,
-            comment: commentText
-        )
-        
-        commentText = ""
-    }
-
-    private struct SummaryRow: View {
-        let title: String
-        let value: Double
-        var titleColor: Color = .white
-        var valueColor: Color = .white
-        
-        var body: some View {
+    // MARK: - Task Summary Section
+    private var taskSummarySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // This forces view refresh when tasks change
+            let _ = taskListRefreshTrigger
+            
             HStack {
-                Text(title)
-                    .foregroundColor(titleColor)
+                Text("Tasks")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                
+                if !proposal.tasksArray.isEmpty {
+                    Text("(\(proposal.tasksArray.count))")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                }
+                
                 Spacer()
-                Text(String(format: "%.2f", value))
-                    .foregroundColor(valueColor)
+                
+                Button(action: {
+                    showingAddTask = true
+                }) {
+                    Label("Add", systemImage: "plus")
+                        .foregroundColor(.blue)
+                }
             }
-            .padding(.vertical, 3)
+            
+            TaskSummaryView(proposal: proposal)
         }
+        .padding(.horizontal)
     }
     
+    // MARK: - Activity Summary Section
+    private var activitySummarySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Recent Activity")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                
+                Spacer()
+                
+                HStack(spacing: 15) {
+                    Button(action: { showingAddComment = true }) {
+                        Label("Add Comment", systemImage: "text.bubble")
+                            .foregroundColor(.blue)
+                    }
+                    
+                    NavigationLink(destination: ActivityDetailView(proposal: proposal)) {
+                        Label("View All", systemImage: "list.bullet")
+                            .foregroundColor(.blue)
+                    }
+                }
+            }
+            
+            ActivityLogView(proposal: proposal)
+        }
+        .padding(.horizontal)
+    }
+    
+    // MARK: - Notes Section
     private func notesSection(notes: String) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 10)
@@ -1222,16 +717,59 @@ struct ProposalDetailView: View {
         .padding(.horizontal)
     }
     
-    private func statusColor(for status: String) -> Color {
-        switch status {
-        case "Draft": return .gray
-        case "Pending": return .orange
-        case "Sent": return .blue
-        case "Won": return .green
-        case "Lost": return .red
-        case "Expired": return .purple
-        default: return .gray
+    // MARK: - Helper Components
+    
+    private struct SummaryRow: View {
+        let title: String
+        let value: Double
+        var titleColor: Color = .white
+        var valueColor: Color = .white
+        
+        var body: some View {
+            HStack {
+                Text(title)
+                    .foregroundColor(titleColor)
+                Spacer()
+                Text(String(format: "%.2f", value))
+                    .foregroundColor(valueColor)
+            }
+            .padding(.vertical, 3)
         }
+    }
+    
+    // MARK: - Helper Methods
+    
+    // Helper method to get list price (calculated from unit price if overridden)
+    private func getListPrice(for item: ProposalItem) -> Double {
+        // If unit price is different from default calculation, calculate what the list price was
+        if let product = item.product, product.listPrice > 0 {
+            let defaultUnitPrice = product.listPrice * (1 - item.discount / 100.0)
+            if abs(defaultUnitPrice - item.unitPrice) > 0.01 {
+                // Price has been overridden, calculate what the list price would be
+                return item.unitPrice / (1 - item.discount / 100.0)
+            }
+        }
+        return item.product?.listPrice ?? 0
+    }
+    
+    // Helper method to get partner price (use product's default partner price)
+    private func getPartnerPrice(for item: ProposalItem) -> Double {
+        // For now, we always use the product's partner price
+        // In a future version, we could calculate this based on overridden values if needed
+        return item.product?.partnerPrice ?? 0
+    }
+    
+    // Helper method to calculate multiplier value
+    private func calculateMultiplier(_ item: ProposalItem) -> Double {
+        // Calculate it based on the formula
+        let listPrice = getListPrice(for: item)
+        if listPrice > 0 {
+            let discountFactor = 1.0 - (item.discount / 100.0)
+            if discountFactor > 0 {
+                return item.unitPrice / (listPrice * discountFactor)
+            }
+        }
+        return 1.0 // Default value
     }
     
     private func calculatePartnerCost() -> Double {
@@ -1239,9 +777,8 @@ struct ProposalDetailView: View {
         
         // Sum partner cost for all products
         for item in proposal.itemsArray {
-            if let product = item.product {
-                totalCost += product.partnerPrice * item.quantity
-            }
+            let partnerPrice = getPartnerPrice(for: item)
+            totalCost += partnerPrice * item.quantity
         }
         
         // Add expenses
@@ -1249,6 +786,8 @@ struct ProposalDetailView: View {
         
         return totalCost
     }
+    
+    // MARK: - CRUD Operations
     
     private func deleteItem(_ item: ProposalItem) {
         withAnimation {
@@ -1344,7 +883,7 @@ struct ProposalDetailView: View {
     private func updateProposalTotal() {
         // Calculate total amount from all components
         let productsTotal = proposal.subtotalProducts
-        let engineeringTotal = proposal.subtotalEngineering 
+        let engineeringTotal = proposal.subtotalEngineering
         let expensesTotal = proposal.subtotalExpenses
         let taxesTotal = proposal.subtotalTaxes
         
@@ -1355,6 +894,94 @@ struct ProposalDetailView: View {
         } catch {
             let nsError = error as NSError
             print("Error updating proposal total: \(nsError), \(nsError.userInfo)")
+        }
+    }
+    
+    private func addComment() {
+        ActivityLogger.logCommentAdded(
+            proposal: proposal,
+            context: viewContext,
+            comment: commentText
+        )
+        
+        commentText = ""
+    }
+}
+
+// MARK: - Proposal Header Section
+struct ProposalHeaderSection: View {
+    let proposal: Proposal
+    let onEditTapped: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Header with action buttons
+            HStack {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(proposal.formattedNumber)
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                    
+                    Text(proposal.customerName)
+                        .font(.title3)
+                        .foregroundColor(.gray)
+                }
+                
+                Spacer()
+                
+                Button(action: onEditTapped) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 20))
+                        .foregroundColor(.blue)
+                        .padding(10)
+                        .background(Color.black.opacity(0.3))
+                        .cornerRadius(8)
+                }
+            }
+            .padding([.horizontal, .top])
+            
+            // Status and date
+            HStack {
+                // Status badge
+                Text(proposal.formattedStatus)
+                    .font(.subheadline)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(statusColor(for: proposal.formattedStatus))
+                    .foregroundColor(.white)
+                    .cornerRadius(5)
+                
+                Text(proposal.formattedDate)
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+                
+                Spacer()
+                
+                // Amount
+                Text(proposal.formattedTotal)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+            }
+            .padding(.horizontal)
+            
+            Divider()
+                .padding(.top, 5)
+        }
+        .padding(.bottom, 10)
+        .background(Color.black)
+    }
+    
+    private func statusColor(for status: String) -> Color {
+        switch status {
+        case "Draft": return .gray
+        case "Pending": return .orange
+        case "Sent": return .blue
+        case "Won": return .green
+        case "Lost": return .red
+        case "Expired": return .purple
+        default: return .gray
         }
     }
 }
