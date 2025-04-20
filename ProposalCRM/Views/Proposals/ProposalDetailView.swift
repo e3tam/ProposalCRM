@@ -13,8 +13,7 @@ struct ProposalDetailView: View {
     @State private var showingCustomTaxForm = false
     @State private var showingEditProposal = false
     @State private var showingFinancialDetails = false
-    
-    // State variables for deletion confirmation
+    @State private var refreshTrigger = UUID()
     @State private var showDeleteConfirmation = false
     @State private var itemToDelete: ProposalItem?
     
@@ -144,35 +143,59 @@ struct ProposalDetailView: View {
         }
         .sheet(isPresented: $showEditItemSheet) {
             if let item = itemToEdit {
-                EditProposalItemView(item: item, didSave: $didSaveItemChanges)
-                    .environment(\.managedObjectContext, viewContext)
-                    .onDisappear {
-                        if didSaveItemChanges {
-                            // Force refresh the view when changes were saved
-                            updateProposalTotal()
-                            
-                            // Reset the flag
-                            didSaveItemChanges = false
-                            
-                            // Force Core Data to refresh all relevant objects
-                            viewContext.refresh(proposal, mergeChanges: true)
-                            for proposalItem in proposal.itemsArray {
-                                viewContext.refresh(proposalItem, mergeChanges: true)
+                EditProposalItemView(
+                    item: item,
+                    context: viewContext,
+                    didSave: $didSaveItemChanges,
+                    onSave: {
+                        // Force refresh the view
+                        viewContext.refresh(proposal, mergeChanges: true)
+                        for proposalItem in proposal.itemsArray {
+                            viewContext.refresh(proposalItem, mergeChanges: true)
+                            if let product = proposalItem.product {
+                                viewContext.refresh(product, mergeChanges: true)
                             }
-                            
-                            // Force UI refresh by triggering state change
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                viewContext.refreshAllObjects()
-                                // Clear the edit state to force SwiftUI to update
-                                itemToEdit = nil
-                                showEditItemSheet = false
-                                // Trigger another refresh to be sure
-                                withAnimation {
-                                    taskListRefreshTrigger = UUID()  // This will force a view update
-                                }
+                        }
+                        refreshTrigger = UUID()
+                    }
+                )
+                .environment(\.managedObjectContext, viewContext)
+                .onAppear {
+                    // Force refresh the item when the sheet appears to ensure all relationships are loaded
+                    viewContext.refresh(item, mergeChanges: true)
+                    
+                    // Also refresh the product relationship if it exists
+                    if let product = item.product {
+                        viewContext.refresh(product, mergeChanges: true)
+                    }
+                }
+                .onDisappear {
+                    if didSaveItemChanges {
+                        // Force refresh the view when changes were saved
+                        updateProposalTotal()
+                        
+                        // Reset the flag
+                        didSaveItemChanges = false
+                        
+                        // Force Core Data to refresh all relevant objects
+                        viewContext.refresh(proposal, mergeChanges: true)
+                        for proposalItem in proposal.itemsArray {
+                            viewContext.refresh(proposalItem, mergeChanges: true)
+                        }
+                        
+                        // Force UI refresh by triggering state change
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            viewContext.refreshAllObjects()
+                            // Clear the edit state to force SwiftUI to update
+                            itemToEdit = nil
+                            showEditItemSheet = false
+                            // Trigger another refresh to be sure
+                            withAnimation {
+                                taskListRefreshTrigger = UUID()  // This will force a view update
                             }
                         }
                     }
+                }
             }
         }
         // TASK PRESENTATION SHEET
@@ -212,9 +235,46 @@ struct ProposalDetailView: View {
         }
     }
     
+    private func openEditItemView(for item: ProposalItem) {
+        guard let context = item.managedObjectContext else {
+            print("Error: No managed object context available")
+            return
+        }
+        
+        // FIX: Ensure the item and its relationships are fully faulted
+        DispatchQueue.main.async {
+            context.perform {
+                if item.isFault {
+                    context.refresh(item, mergeChanges: true)
+                }
+                
+                if let product = item.product, product.isFault {
+                    context.refresh(product, mergeChanges: true)
+                }
+                
+                // FIX: Fetch the item again to ensure it's fully loaded
+                if let itemID = item.objectID as? NSManagedObjectID {
+                    if let fetchedItem = try? context.existingObject(with: itemID) as? ProposalItem {
+                        DispatchQueue.main.async {
+                            self.itemToEdit = fetchedItem
+                            self.showEditItemSheet = true
+                        }
+                    } else {
+                        // Fallback to original item
+                        DispatchQueue.main.async {
+                            self.itemToEdit = item
+                            self.showEditItemSheet = true
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     // MARK: - Products Section with Fixed Table Headers
     private var productsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let _ = refreshTrigger // Force view update when refreshTrigger changes
+        return VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Products")
                     .font(.title2)
@@ -367,8 +427,7 @@ struct ProposalDetailView: View {
                                     // Action buttons
                                     HStack(spacing: 15) {
                                         Button(action: {
-                                            itemToEdit = item
-                                            showEditItemSheet = true
+                                            openEditItemView(for: item)
                                         }) {
                                             Image(systemName: "pencil")
                                                 .foregroundColor(.blue)

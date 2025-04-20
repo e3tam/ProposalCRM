@@ -284,6 +284,7 @@ struct ProductTableView: View {
 
 // Usage in ProposalDetailView:
 struct ProductsSection: View {
+  
     @ObservedObject var proposal: Proposal
     
     var body: some View {

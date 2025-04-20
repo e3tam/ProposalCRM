@@ -30,14 +30,7 @@ extension ProposalItem {
     }
     
     // Apply custom tax flag
-    var applyCustomTax: Bool {
-        get {
-            return value(forKey: "applyCustomTax") as? Bool ?? false
-        }
-        set {
-            setValue(newValue, forKey: "applyCustomTax")
-        }
-    }
+
     
     // Custom description
     var customDescription: String {

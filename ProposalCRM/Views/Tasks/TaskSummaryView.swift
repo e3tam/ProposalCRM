@@ -18,26 +18,6 @@ struct TaskSummaryView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Tasks")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                
-                if proposal.tasksArray.count > 0 {
-                    Text("(\(proposal.tasksArray.count))")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                }
-                
-                Spacer()
-                
-                Button(action: { showingAddTask = true }) {
-                    Label("Add", systemImage: "plus")
-                        .foregroundColor(.blue)
-                }
-            }
-            
             if proposal.tasksArray.isEmpty {
                 Text("No tasks created yet")
                     .foregroundColor(.gray)
@@ -126,7 +106,6 @@ struct TaskSummaryView: View {
                 }
             }
         }
-        .padding(.horizontal)
         .sheet(isPresented: $showingAddTask) {
             AddTaskView(proposal: proposal)
         }

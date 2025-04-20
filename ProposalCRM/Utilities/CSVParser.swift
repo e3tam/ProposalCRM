@@ -174,13 +174,3 @@ class CSVParser {
         return field
     }
 }
-
-// Struct to hold product data from CSV
-struct ProductData {
-    let code: String
-    let name: String
-    let description: String
-    let category: String
-    let listPrice: Double
-    let partnerPrice: Double
-}
