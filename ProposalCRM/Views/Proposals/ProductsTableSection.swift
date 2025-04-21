@@ -1,15 +1,5 @@
-//
-//  ProductsTableSection.swift
-//  ProposalCRM
-//
-//  Created by Ali Sami Gözükırmızı on 21.04.2025.
-//
-
-
-//
-//  TableSectionViews.swift
-//  ProposalCRM
-//
+// ProductsTableSection.swift
+// Properly connects to the refactored ProductTableView
 
 import SwiftUI
 
@@ -45,6 +35,8 @@ struct ProductsTableSection: View {
     }
 }
 
+// This implementation can stay in the same file as ProductsTableSection
+// or you can move it to its own file
 struct EngineeringTableSection: View {
     let proposal: Proposal
     let onAdd: () -> Void

@@ -1,5 +1,7 @@
 import SwiftUI
 import CoreData
+import PDFKit
+import UIKit
 
 struct ProposalDetailView: View {
     @Environment(\.managedObjectContext) private var viewContext
@@ -38,6 +40,12 @@ struct ProposalDetailView: View {
     // State variables for custom tax editing
     @State private var taxToEdit: CustomTax?
     @State private var showEditTaxSheet = false
+    
+    // PDF Export state variables
+    @State private var showingPdfPreview = false
+    @State private var pdfUrl: URL?
+    @State private var isGeneratingPdf = false
+    @State private var showShareSheet = false
     
     var body: some View {
         ZStack {
@@ -121,8 +129,22 @@ struct ProposalDetailView: View {
                         if let notes = proposal.notes, !notes.isEmpty {
                             notesSection(notes: notes)
                         }
+                        
+                        // Add spacing at bottom for floating button
+                        Spacer().frame(height: 80)
                     }
                     .padding(.vertical, 20)
+                }
+            }
+            
+            // Floating PDF export button positioned at bottom right
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    pdfExportButton
+                        .padding(.bottom, 30)
+                        .padding(.trailing, 20)
                 }
             }
         }
@@ -207,6 +229,12 @@ struct ProposalDetailView: View {
                 .environment(\.managedObjectContext, viewContext)
             }
         }
+        // PDF PREVIEW SHEET
+        .sheet(isPresented: $showingPdfPreview) {
+            if let url = pdfUrl {
+                PDFPreviewView(url: url)
+            }
+        }
         // TASK PRESENTATION SHEET
         .sheet(isPresented: $showingAddTask) {
             AddTaskView(proposal: proposal)
@@ -234,6 +262,63 @@ struct ProposalDetailView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Are you sure you want to delete this item from the proposal?")
+        }
+    }
+    
+    // MARK: - PDF Export Components
+    
+    // PDF Export Button
+    var pdfExportButton: some View {
+        Button(action: {
+            exportToPdf()
+        }) {
+            HStack {
+                Image(systemName: "doc.text")
+                Text("Export PDF")
+            }
+            .padding()
+            .background(Color.blue)
+            .foregroundColor(.white)
+            .cornerRadius(10)
+            .shadow(radius: 3)
+        }
+        .disabled(isGeneratingPdf)
+        .overlay(
+            isGeneratingPdf ?
+            ProgressView()
+                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                .padding(.trailing, 8)
+            : nil
+        )
+    }
+    
+    // PDF Export function
+    private func exportToPdf() {
+        isGeneratingPdf = true
+        
+        // Generate PDF in background
+        DispatchQueue.global(qos: .userInitiated).async {
+            if let pdfData = PDFGenerator.generateProposalPDF(from: proposal) {
+                let fileName = "Proposal_\(proposal.formattedNumber)_\(Date().timeIntervalSince1970).pdf"
+                if let url = PDFGenerator.savePDF(pdfData, fileName: fileName) {
+                    // Update UI on main thread
+                    DispatchQueue.main.async {
+                        self.pdfUrl = url
+                        self.isGeneratingPdf = false
+                        self.showingPdfPreview = true
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        self.isGeneratingPdf = false
+                        // Handle error - could add alert here
+                    }
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.isGeneratingPdf = false
+                    // Handle error - could add alert here
+                }
+            }
         }
     }
     
@@ -565,6 +650,72 @@ struct ProposalDetailView: View {
         )
         
         commentText = ""
+    }
+}
+
+// MARK: - PDF Preview Components
+
+// PDF Preview View
+struct PDFPreviewView: View {
+    let url: URL
+    @Environment(\.presentationMode) var presentationMode
+    @State private var showShareSheet = false
+    
+    var body: some View {
+        NavigationView {
+            PDFKitView(url: url)
+                .navigationTitle("Proposal PDF")
+                .navigationBarItems(
+                    leading: Button("Done") {
+                        presentationMode.wrappedValue.dismiss()
+                    },
+                    trailing: Button(action: {
+                        showShareSheet = true
+                    }) {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                )
+                .sheet(isPresented: $showShareSheet) {
+                    ShareSheet(items: [url])
+                }
+        }
+    }
+}
+
+// PDFKit wrapper
+struct PDFKitView: UIViewRepresentable {
+    let url: URL
+    
+    func makeUIView(context: Context) -> PDFView {
+        let pdfView = PDFView()
+        pdfView.autoScales = true
+        
+        if let document = PDFDocument(url: url) {
+            pdfView.document = document
+        }
+        
+        return pdfView
+    }
+    
+    func updateUIView(_ uiView: PDFView, context: Context) {
+        // Nothing to update
+    }
+}
+
+// ShareSheet view
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(
+            activityItems: items,
+            applicationActivities: nil
+        )
+        return controller
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
+        // Nothing to update
     }
 }
 
