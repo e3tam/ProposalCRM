@@ -8,6 +8,7 @@ struct AddCustomerView: View {
     @Environment(\.presentationMode) var presentationMode
     
     @State private var name = ""
+    @State private var contactName = ""
     @State private var email = ""
     @State private var phone = ""
     @State private var address = ""
@@ -18,11 +19,17 @@ struct AddCustomerView: View {
                 Section(header: Text("Customer Information")) {
                     TextField("Company Name", text: $name)
                         .autocapitalization(.words)
+                    
+                    TextField("Contact Person", text: $contactName)
+                        .autocapitalization(.words)
+                    
                     TextField("Email", text: $email)
                         .keyboardType(.emailAddress)
                         .autocapitalization(.none)
+                    
                     TextField("Phone", text: $phone)
                         .keyboardType(.phonePad)
+                    
                     TextField("Address", text: $address)
                         .autocapitalization(.words)
                 }
@@ -49,6 +56,7 @@ struct AddCustomerView: View {
         let newCustomer = Customer(context: viewContext)
         newCustomer.id = UUID()
         newCustomer.name = name
+        newCustomer.contactName = contactName
         newCustomer.email = email
         newCustomer.phone = phone
         newCustomer.address = address

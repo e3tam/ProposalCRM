@@ -1,127 +1,93 @@
-//
-//  EngineeringView.swift
-//  ProposalCRM
-//
-//  Created by Ali Sami Gözükırmızı on 19.04.2025.
-//
-
-
-// EngineeringView.swift
-// View for adding new engineering entries
-
 import SwiftUI
 import CoreData
 
 struct EngineeringView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.presentationMode) var presentationMode
-    
     @ObservedObject var proposal: Proposal
     
     @State private var description = ""
-    @State private var days = 1.0
-    @State private var rate = 800.0
-    
-    var amount: Double {
-        return days * rate
-    }
+    @State private var days = ""
+    @State private var rate = ""
     
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Engineering Details")) {
+                Section(header: Text("ENGINEERING SERVICE")) {
                     TextField("Description", text: $description)
                     
-                    // Fixed Days control with proper state updates
-                    HStack {
-                        Text("Days")
-                        Spacer()
-                        
-                        // Improve button hit targets and add state update
-                        HStack(spacing: 12) {
-                            Button(action: {
-                                withAnimation {
-                                    if days > 0.5 {
-                                        days -= 0.5
-                                    }
-                                }
-                            }) {
-                                Image(systemName: "minus")
-                                    .frame(width: 32, height: 32)
-                                    .background(Color.gray.opacity(0.2))
-                                    .clipShape(Circle())
-                            }
-                            .buttonStyle(BorderlessButtonStyle()) // Important for nested buttons
-                            
-                            Text(String(format: "%.1f", days))
-                                .frame(minWidth: 40, alignment: .center)
-                            
-                            Button(action: {
-                                withAnimation {
-                                    days += 0.5
-                                }
-                            }) {
-                                Image(systemName: "plus")
-                                    .frame(width: 32, height: 32)
-                                    .background(Color.gray.opacity(0.2))
-                                    .clipShape(Circle())
-                            }
-                            .buttonStyle(BorderlessButtonStyle()) // Important for nested buttons
-                        }
-                    }
+                    TextField("Days", text: $days)
+                        .keyboardType(.decimalPad)
                     
                     HStack {
-                        Text("Day Rate")
+                        Text("Rate (€)")
                         Spacer()
-                        TextField("Rate", value: $rate, formatter: NumberFormatter())
+                        TextField("", text: $rate)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                             .frame(width: 100)
                     }
                     
-                    HStack {
-                        Text("Total Amount")
-                            .font(.headline)
-                        Spacer()
-                        Text(String(format: "%.2f", amount))
-                            .font(.headline)
+                    // Amount (calculated)
+                    if let daysValue = Double(days), let rateValue = Double(rate) {
+                        let amount = daysValue * rateValue
+                        HStack {
+                            Text("Amount")
+                            Spacer()
+                            Text(String(format: "€%.2f", amount))
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
             }
             .navigationTitle("Add Engineering")
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         presentationMode.wrappedValue.dismiss()
                     }
                 }
                 
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Add") {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
                         addEngineering()
                     }
-                    .disabled(days <= 0 || rate <= 0)
+                    .disabled(!isFormValid)
                 }
             }
         }
+    }
+    
+    private var isFormValid: Bool {
+        !description.isEmpty && Double(days) != nil && Double(rate) != nil
     }
     
     private func addEngineering() {
         let engineering = Engineering(context: viewContext)
         engineering.id = UUID()
         engineering.desc = description
-        engineering.days = days
-        engineering.rate = rate
-        engineering.amount = amount
+        engineering.days = Double(days) ?? 0
+        engineering.rate = Double(rate) ?? 0
+        engineering.amount = engineering.days * engineering.rate
         engineering.proposal = proposal
         
         do {
             try viewContext.save()
+            
+            // Update proposal total
             updateProposalTotal()
+            
+            // Log activity
+            ActivityLogger.logItemAdded(
+                proposal: proposal,
+                context: viewContext,
+                itemType: "Engineering",
+                itemName: description
+            )
+            
             presentationMode.wrappedValue.dismiss()
         } catch {
-            let nsError = error as NSError
-            print("Error adding engineering: \(nsError), \(nsError.userInfo)")
+            print("Error adding engineering: \(error)")
         }
     }
     
@@ -136,8 +102,7 @@ struct EngineeringView: View {
         do {
             try viewContext.save()
         } catch {
-            let nsError = error as NSError
-            print("Error updating proposal total: \(nsError), \(nsError.userInfo)")
+            print("Error updating proposal total: \(error)")
         }
     }
 }

@@ -28,6 +28,13 @@ struct CustomerDetailView: View {
                     
                     Divider()
                     
+                    if let contactName = customer.contactName, !contactName.isEmpty {
+                        HStack {
+                            Label(contactName, systemImage: "person")
+                                .font(.headline)
+                        }
+                    }
+                    
                     HStack {
                         Label(customer.email ?? "No Email", systemImage: "envelope")
                     }

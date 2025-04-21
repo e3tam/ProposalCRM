@@ -15,6 +15,18 @@ struct ProductTableView: View {
     let onEdit: (ProposalItem) -> Void
     @Environment(\.colorScheme) var colorScheme
     
+    // Format currency to euros
+    private func formatEuro(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "EUR"
+        formatter.currencySymbol = "€"
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        
+        return formatter.string(from: NSNumber(value: value)) ?? "€\(String(format: "%.2f", value))"
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             // Table header with scrollable view for all columns
@@ -169,7 +181,7 @@ struct ProductTableView: View {
                                     
                                     // Unit Partner Price
                                     let partnerPrice = item.product?.partnerPrice ?? 0
-                                    Text(String(format: "%.2f", partnerPrice))
+                                    Text(formatEuro(partnerPrice))
                                         .font(.system(size: 14))
                                         .frame(width: 120, alignment: .trailing)
                                         .padding(.horizontal, 5)
@@ -178,7 +190,7 @@ struct ProductTableView: View {
                                     
                                     // Unit List Price
                                     let listPrice = item.product?.listPrice ?? 0
-                                    Text(String(format: "%.2f", listPrice))
+                                    Text(formatEuro(listPrice))
                                         .font(.system(size: 14))
                                         .frame(width: 120, alignment: .trailing)
                                         .padding(.horizontal, 5)
@@ -203,7 +215,7 @@ struct ProductTableView: View {
                                     
                                     // Ext Partner Price
                                     let extPartnerPrice = partnerPrice * item.quantity
-                                    Text(String(format: "%.2f", extPartnerPrice))
+                                    Text(formatEuro(extPartnerPrice))
                                         .font(.system(size: 14))
                                         .frame(width: 120, alignment: .trailing)
                                         .padding(.horizontal, 5)
@@ -212,7 +224,7 @@ struct ProductTableView: View {
                                     
                                     // Ext List Price
                                     let extListPrice = listPrice * item.quantity
-                                    Text(String(format: "%.2f", extListPrice))
+                                    Text(formatEuro(extListPrice))
                                         .font(.system(size: 14))
                                         .frame(width: 120, alignment: .trailing)
                                         .padding(.horizontal, 5)
@@ -220,7 +232,7 @@ struct ProductTableView: View {
                                     Divider().frame(height: 40)
                                     
                                     // Ext Customer Price (amount)
-                                    Text(String(format: "%.2f", item.amount))
+                                    Text(formatEuro(item.amount))
                                         .font(.system(size: 14))
                                         .frame(width: 120, alignment: .trailing)
                                         .padding(.horizontal, 5)
@@ -229,7 +241,7 @@ struct ProductTableView: View {
                                     
                                     // Total Profit
                                     let profit = item.amount - extPartnerPrice
-                                    Text(String(format: "%.2f", profit))
+                                    Text(formatEuro(profit))
                                         .font(.system(size: 14))
                                         .foregroundColor(profit > 0 ? .green : .red)
                                         .frame(width: 100, alignment: .trailing)

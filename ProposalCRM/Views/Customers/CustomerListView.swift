@@ -21,9 +21,18 @@ struct CustomerListView: View {
                     VStack(alignment: .leading) {
                         Text(customer.formattedName)
                             .font(.headline)
-                        Text(customer.email ?? "")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                        
+                        if let contactName = customer.contactName, !contactName.isEmpty {
+                            Text(contactName)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        if let email = customer.email, !email.isEmpty {
+                            Text(email)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
             }
@@ -49,6 +58,7 @@ struct CustomerListView: View {
         } else {
             return customers.filter { customer in
                 customer.name?.localizedCaseInsensitiveContains(searchText) ?? false ||
+                customer.contactName?.localizedCaseInsensitiveContains(searchText) ?? false ||
                 customer.email?.localizedCaseInsensitiveContains(searchText) ?? false ||
                 customer.phone?.localizedCaseInsensitiveContains(searchText) ?? false
             }

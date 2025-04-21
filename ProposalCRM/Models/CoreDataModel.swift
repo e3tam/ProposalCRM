@@ -8,18 +8,6 @@ import SwiftUI // Added SwiftUI import for Color
 // MARK: - CoreData entity extensions
 
 // Customer extension
-extension Customer {
-    var formattedName: String {
-        return name ?? "Unknown Customer"
-    }
-    
-    var proposalsArray: [Proposal] {
-        let set = proposals as? Set<Proposal> ?? []
-        return set.sorted {
-            $0.creationDate ?? Date() > $1.creationDate ?? Date()
-        }
-    }
-}
 
 // Product extension
 extension Product {
@@ -303,6 +291,19 @@ extension Activity {
         case "TaskCompleted": return .green
         case "DocumentAdded": return .gray
         default: return .gray
+        }
+    }
+}
+// Customer extension
+extension Customer {
+    var formattedName: String {
+        return name ?? "Unknown Customer"
+    }
+    
+    var proposalsArray: [Proposal] {
+        let set = proposals as? Set<Proposal> ?? []
+        return set.sorted {
+            $0.creationDate ?? Date() > $1.creationDate ?? Date()
         }
     }
 }

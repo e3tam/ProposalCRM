@@ -1,8 +1,3 @@
-//
-//  ExpensesView.swift
-//  ProposalCRM
-//
-
 import SwiftUI
 import CoreData
 
@@ -12,55 +7,81 @@ struct ExpensesView: View {
     @ObservedObject var proposal: Proposal
     
     @State private var description = ""
-    @State private var amount: String = ""
+    @State private var amount = ""
     
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Expense Details")) {
+                Section(header: Text("EXPENSE DETAILS")) {
                     TextField("Description", text: $description)
                     
-                    TextField("Amount", text: $amount)
-                        .keyboardType(.decimalPad)
+                    HStack {
+                        Text("Amount (€)")
+                        Spacer()
+                        TextField("", text: $amount)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 120)
+                    }
+                }
+                
+                // Common expense templates
+                Section(header: Text("QUICK ADD")) {
+                    Button("Shipping/Freight") {
+                        description = "Shipping and Freight"
+                        // Amount remains empty for user to fill
+                    }
+                    
+                    Button("Installation") {
+                        description = "Installation Services"
+                        // Amount remains empty for user to fill
+                    }
+                    
+                    Button("Travel Expenses") {
+                        description = "Travel and Accommodation"
+                        // Amount remains empty for user to fill
+                    }
+                    
+                    Button("Materials") {
+                        description = "Additional Materials"
+                        // Amount remains empty for user to fill
+                    }
                 }
             }
             .navigationTitle("Add Expense")
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         presentationMode.wrappedValue.dismiss()
                     }
                 }
                 
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         addExpense()
                     }
-                    .disabled(description.isEmpty || amount.isEmpty)
+                    .disabled(!isFormValid)
                 }
             }
         }
     }
     
+    private var isFormValid: Bool {
+        !description.isEmpty && Double(amount) != nil
+    }
+    
     private func addExpense() {
-        let newExpense = Expense(context: viewContext)
-        newExpense.id = UUID()
-        newExpense.desc = description
-        newExpense.amount = Double(amount) ?? 0
-        newExpense.proposal = proposal
+        let expense = Expense(context: viewContext)
+        expense.id = UUID()
+        expense.desc = description
+        expense.amount = Double(amount) ?? 0
+        expense.proposal = proposal
         
         do {
             try viewContext.save()
             
-            // Update proposal totals
-            let productsTotal = proposal.subtotalProducts
-            let engineeringTotal = proposal.subtotalEngineering
-            let expensesTotal = proposal.subtotalExpenses
-            let taxesTotal = proposal.subtotalTaxes
-            
-            proposal.totalAmount = productsTotal + engineeringTotal + expensesTotal + taxesTotal
-            
-            try viewContext.save()
+            // Update proposal total
+            updateProposalTotal()
             
             // Log activity
             ActivityLogger.logItemAdded(
@@ -72,7 +93,22 @@ struct ExpensesView: View {
             
             presentationMode.wrappedValue.dismiss()
         } catch {
-            print("Error saving expense: \(error)")
+            print("Error adding expense: \(error)")
+        }
+    }
+    
+    private func updateProposalTotal() {
+        let productsTotal = proposal.subtotalProducts
+        let engineeringTotal = proposal.subtotalEngineering
+        let expensesTotal = proposal.subtotalExpenses
+        let taxesTotal = proposal.subtotalTaxes
+        
+        proposal.totalAmount = productsTotal + engineeringTotal + expensesTotal + taxesTotal
+        
+        do {
+            try viewContext.save()
+        } catch {
+            print("Error updating proposal total: \(error)")
         }
     }
 }
