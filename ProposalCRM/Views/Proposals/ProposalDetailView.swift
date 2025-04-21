@@ -13,7 +13,6 @@ struct ProposalDetailView: View {
     @State private var showingCustomTaxForm = false
     @State private var showingEditProposal = false
     @State private var showingFinancialDetails = false
-    @State private var refreshTrigger = UUID()
     @State private var showDeleteConfirmation = false
     @State private var itemToDelete: ProposalItem?
     
@@ -21,7 +20,7 @@ struct ProposalDetailView: View {
     @State private var showingAddTask = false
     @State private var showingAddComment = false
     @State private var commentText = ""
-    @State private var taskListRefreshTrigger = UUID()
+    @State private var refreshId = UUID()  // Simple refresh trigger
     
     // State variables for product item editing
     @State private var itemToEdit: ProposalItem?
@@ -57,6 +56,7 @@ struct ProposalDetailView: View {
                     VStack(alignment: .leading, spacing: 20) {
                         // PRODUCTS SECTION
                         productsSection
+                            .id(refreshId)  // Force refresh when id changes
                         
                         // ENGINEERING SECTION
                         engineeringSection
@@ -141,72 +141,33 @@ struct ProposalDetailView: View {
                 }
             }
         }
-        .sheet(isPresented: $showEditItemSheet) {
+        .sheet(isPresented: $showEditItemSheet, onDismiss: {
+            // Reset edit state
+            itemToEdit = nil
+            showEditItemSheet = false
+            
+            // Force complete view refresh
+            if didSaveItemChanges {
+                refreshId = UUID()
+                didSaveItemChanges = false
+            }
+        }) {
             if let item = itemToEdit {
-                EditProposalItemView(
+                ProposalItemDebugWrapper(
                     item: item,
-                    context: viewContext,
                     didSave: $didSaveItemChanges,
                     onSave: {
-                        // Force refresh the view
-                        viewContext.refresh(proposal, mergeChanges: true)
-                        for proposalItem in proposal.itemsArray {
-                            viewContext.refresh(proposalItem, mergeChanges: true)
-                            if let product = proposalItem.product {
-                                viewContext.refresh(product, mergeChanges: true)
-                            }
+                        // Force view refresh
+                        DispatchQueue.main.async {
+                            refreshId = UUID()
                         }
-                        refreshTrigger = UUID()
                     }
                 )
                 .environment(\.managedObjectContext, viewContext)
-                .onAppear {
-                    // Force refresh the item when the sheet appears to ensure all relationships are loaded
-                    viewContext.refresh(item, mergeChanges: true)
-                    
-                    // Also refresh the product relationship if it exists
-                    if let product = item.product {
-                        viewContext.refresh(product, mergeChanges: true)
-                    }
-                }
-                .onDisappear {
-                    if didSaveItemChanges {
-                        // Force refresh the view when changes were saved
-                        updateProposalTotal()
-                        
-                        // Reset the flag
-                        didSaveItemChanges = false
-                        
-                        // Force Core Data to refresh all relevant objects
-                        viewContext.refresh(proposal, mergeChanges: true)
-                        for proposalItem in proposal.itemsArray {
-                            viewContext.refresh(proposalItem, mergeChanges: true)
-                        }
-                        
-                        // Force UI refresh by triggering state change
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            viewContext.refreshAllObjects()
-                            // Clear the edit state to force SwiftUI to update
-                            itemToEdit = nil
-                            showEditItemSheet = false
-                            // Trigger another refresh to be sure
-                            withAnimation {
-                                taskListRefreshTrigger = UUID()  // This will force a view update
-                            }
-                        }
-                    }
-                }
             }
         }
         // TASK PRESENTATION SHEET
-        .sheet(isPresented: $showingAddTask, onDismiss: {
-            print("DEBUG: Add Task sheet dismissed")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                self.taskListRefreshTrigger = UUID()
-                let context = PersistenceController.shared.container.viewContext
-                context.refreshAllObjects()
-            }
-        }) {
+        .sheet(isPresented: $showingAddTask) {
             AddTaskView(proposal: proposal)
                 .environment(\.managedObjectContext, viewContext)
         }
@@ -236,45 +197,13 @@ struct ProposalDetailView: View {
     }
     
     private func openEditItemView(for item: ProposalItem) {
-        guard let context = item.managedObjectContext else {
-            print("Error: No managed object context available")
-            return
-        }
-        
-        // FIX: Ensure the item and its relationships are fully faulted
-        DispatchQueue.main.async {
-            context.perform {
-                if item.isFault {
-                    context.refresh(item, mergeChanges: true)
-                }
-                
-                if let product = item.product, product.isFault {
-                    context.refresh(product, mergeChanges: true)
-                }
-                
-                // FIX: Fetch the item again to ensure it's fully loaded
-                if let itemID = item.objectID as? NSManagedObjectID {
-                    if let fetchedItem = try? context.existingObject(with: itemID) as? ProposalItem {
-                        DispatchQueue.main.async {
-                            self.itemToEdit = fetchedItem
-                            self.showEditItemSheet = true
-                        }
-                    } else {
-                        // Fallback to original item
-                        DispatchQueue.main.async {
-                            self.itemToEdit = item
-                            self.showEditItemSheet = true
-                        }
-                    }
-                }
-            }
-        }
+        itemToEdit = item
+        showEditItemSheet = true
     }
     
     // MARK: - Products Section with Fixed Table Headers
     private var productsSection: some View {
-        let _ = refreshTrigger // Force view update when refreshTrigger changes
-        return VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Products")
                     .font(.title2)
@@ -346,8 +275,8 @@ struct ProposalDetailView: View {
                                     
                                     TableDivider()
                                     
-                                    // Unit Partner Price (use overridden value if exists)
-                                    let partnerPrice = getPartnerPrice(for: item)
+                                    // Unit Partner Price
+                                    let partnerPrice = item.product?.partnerPrice ?? 0
                                     Text(String(format: "%.2f", partnerPrice))
                                         .font(.system(size: 14))
                                         .frame(width: 120, alignment: .trailing)
@@ -355,8 +284,8 @@ struct ProposalDetailView: View {
                                     
                                     TableDivider()
                                     
-                                    // Unit List Price (use overridden value if exists)
-                                    let listPrice = getListPrice(for: item)
+                                    // Unit List Price
+                                    let listPrice = item.product?.listPrice ?? 0
                                     Text(String(format: "%.2f", listPrice))
                                         .font(.system(size: 14))
                                         .frame(width: 120, alignment: .trailing)
@@ -694,9 +623,6 @@ struct ProposalDetailView: View {
     // MARK: - Task Summary Section
     private var taskSummarySection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // This forces view refresh when tasks change
-            let _ = taskListRefreshTrigger
-            
             HStack {
                 Text("Tasks")
                     .font(.title2)
@@ -798,30 +724,10 @@ struct ProposalDetailView: View {
     
     // MARK: - Helper Methods
     
-    // Helper method to get list price (calculated from unit price if overridden)
-    private func getListPrice(for item: ProposalItem) -> Double {
-        // If unit price is different from default calculation, calculate what the list price was
-        if let product = item.product, product.listPrice > 0 {
-            let defaultUnitPrice = product.listPrice * (1 - item.discount / 100.0)
-            if abs(defaultUnitPrice - item.unitPrice) > 0.01 {
-                // Price has been overridden, calculate what the list price would be
-                return item.unitPrice / (1 - item.discount / 100.0)
-            }
-        }
-        return item.product?.listPrice ?? 0
-    }
-    
-    // Helper method to get partner price (use product's default partner price)
-    private func getPartnerPrice(for item: ProposalItem) -> Double {
-        // For now, we always use the product's partner price
-        // In a future version, we could calculate this based on overridden values if needed
-        return item.product?.partnerPrice ?? 0
-    }
-    
     // Helper method to calculate multiplier value
     private func calculateMultiplier(_ item: ProposalItem) -> Double {
         // Calculate it based on the formula
-        let listPrice = getListPrice(for: item)
+        let listPrice = item.product?.listPrice ?? 0
         if listPrice > 0 {
             let discountFactor = 1.0 - (item.discount / 100.0)
             if discountFactor > 0 {
@@ -836,7 +742,7 @@ struct ProposalDetailView: View {
         
         // Sum partner cost for all products
         for item in proposal.itemsArray {
-            let partnerPrice = getPartnerPrice(for: item)
+            let partnerPrice = item.product?.partnerPrice ?? 0
             totalCost += partnerPrice * item.quantity
         }
         
@@ -865,6 +771,7 @@ struct ProposalDetailView: View {
             do {
                 try viewContext.save()
                 updateProposalTotal()
+                refreshId = UUID() // Force refresh
             } catch {
                 let nsError = error as NSError
                 print("Error deleting item: \(nsError), \(nsError.userInfo)")
