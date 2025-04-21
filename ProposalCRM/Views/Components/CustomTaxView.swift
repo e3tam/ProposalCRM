@@ -1,51 +1,48 @@
-// CustomTaxView.swift
-// Add custom taxes to a proposal
+//
+//  CustomTaxView.swift
+//  ProposalCRM
+//
 
 import SwiftUI
+import CoreData
 
 struct CustomTaxView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.presentationMode) var presentationMode
-    
     @ObservedObject var proposal: Proposal
     
     @State private var name = ""
-    @State private var rate = 0.0
+    @State private var rate: String = ""
     
-    var subtotal: Double {
+    private var taxBase: Double {
         return proposal.subtotalProducts + proposal.subtotalEngineering + proposal.subtotalExpenses
     }
     
-    var amount: Double {
-        return subtotal * (rate / 100)
+    private var calculatedAmount: Double {
+        let rateValue = Double(rate) ?? 0
+        return (taxBase * rateValue) / 100
     }
     
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Custom Tax Details")) {
+                Section(header: Text("Tax Details")) {
                     TextField("Tax Name", text: $name)
                     
+                    TextField("Rate (%)", text: $rate)
+                        .keyboardType(.decimalPad)
+                    
                     HStack {
-                        Text("Rate (%)")
+                        Text("Tax Base:")
                         Spacer()
-                        Slider(value: $rate, in: 0...30, step: 0.5)
-                        Text("\(rate, specifier: "%.1f")%")
-                            .frame(width: 50)
+                        Text(String(format: "%.2f", taxBase))
                     }
                     
                     HStack {
-                        Text("Subtotal")
+                        Text("Tax Amount:")
                         Spacer()
-                        Text(String(format: "%.2f", subtotal))
-                    }
-                    
-                    HStack {
-                        Text("Tax Amount")
-                            .font(.headline)
-                        Spacer()
-                        Text(String(format: "%.2f", amount))
-                            .font(.headline)
+                        Text(String(format: "%.2f", calculatedAmount))
+                            .fontWeight(.bold)
                     }
                 }
             }
@@ -58,50 +55,47 @@ struct CustomTaxView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Add") {
+                    Button("Save") {
                         addCustomTax()
                     }
-                    .disabled(name.isEmpty || rate <= 0)
+                    .disabled(name.isEmpty || rate.isEmpty)
                 }
             }
         }
     }
     
     private func addCustomTax() {
-        let tax = CustomTax(context: viewContext)
-        tax.id = UUID()
-        tax.name = name
-        tax.rate = rate
-        tax.amount = amount
-        tax.proposal = proposal
+        let newTax = CustomTax(context: viewContext)
+        newTax.id = UUID()
+        newTax.name = name
+        newTax.rate = Double(rate) ?? 0
+        newTax.amount = calculatedAmount
+        newTax.proposal = proposal
         
         do {
             try viewContext.save()
             
-            // Update proposal total
-            updateProposalTotal()
+            // Update proposal totals
+            let productsTotal = proposal.subtotalProducts
+            let engineeringTotal = proposal.subtotalEngineering
+            let expensesTotal = proposal.subtotalExpenses
+            let taxesTotal = proposal.subtotalTaxes
+            
+            proposal.totalAmount = productsTotal + engineeringTotal + expensesTotal + taxesTotal
+            
+            try viewContext.save()
+            
+            // Log activity
+            ActivityLogger.logItemAdded(
+                proposal: proposal,
+                context: viewContext,
+                itemType: "Tax",
+                itemName: name
+            )
             
             presentationMode.wrappedValue.dismiss()
         } catch {
-            let nsError = error as NSError
-            print("Error adding custom tax: \(nsError), \(nsError.userInfo)")
-        }
-    }
-    
-    private func updateProposalTotal() {
-        // Calculate total amount
-        let productsTotal = proposal.subtotalProducts
-        let engineeringTotal = proposal.subtotalEngineering
-        let expensesTotal = proposal.subtotalExpenses
-        let taxesTotal = proposal.subtotalTaxes
-        
-        proposal.totalAmount = productsTotal + engineeringTotal + expensesTotal + taxesTotal
-        
-        do {
-            try viewContext.save()
-        } catch {
-            let nsError = error as NSError
-            print("Error updating proposal total: \(nsError), \(nsError.userInfo)")
+            print("Error saving custom tax: \(error)")
         }
     }
 }

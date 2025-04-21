@@ -12,7 +12,7 @@
 import SwiftUI
 import CoreData
 
-struct EditCustomTaxView: View {
+struct EditCustomTaxView_: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.presentationMode) var presentationMode
     @ObservedObject var customTax: CustomTax

@@ -55,17 +55,58 @@ struct ProposalDetailView: View {
                     // Content sections with proper spacing
                     VStack(alignment: .leading, spacing: 20) {
                         // PRODUCTS SECTION
-                        productsSection
-                            .id(refreshId)  // Force refresh when id changes
+                        ProductsTableSection(
+                            proposal: proposal,
+                            onAdd: { showingItemSelection = true },
+                            onEdit: { item in
+                                itemToEdit = item
+                                showEditItemSheet = true
+                            },
+                            onDelete: { item in
+                                itemToDelete = item
+                                showDeleteConfirmation = true
+                            }
+                        )
+                        .id(refreshId)  // Force refresh when id changes
                         
                         // ENGINEERING SECTION
-                        engineeringSection
+                        EngineeringTableSection(
+                            proposal: proposal,
+                            onAdd: { showingEngineeringForm = true },
+                            onEdit: { engineering in
+                                engineeringToEdit = engineering
+                                showEditEngineeringSheet = true
+                            },
+                            onDelete: { engineering in
+                                deleteEngineering(engineering)
+                            }
+                        )
                         
                         // EXPENSES SECTION
-                        expensesSection
+                        ExpensesTableSection(
+                            proposal: proposal,
+                            onAdd: { showingExpensesForm = true },
+                            onEdit: { expense in
+                                expenseToEdit = expense
+                                showEditExpenseSheet = true
+                            },
+                            onDelete: { expense in
+                                deleteExpense(expense)
+                            }
+                        )
                         
                         // CUSTOM TAXES SECTION
-                        customTaxesSection
+                        CustomTaxesTableSection(
+                            proposal: proposal,
+                            onAdd: { showingCustomTaxForm = true },
+                            onEdit: { tax in
+                                taxToEdit = tax
+                                showEditTaxSheet = true
+                            },
+                            onDelete: { tax in
+                                deleteTax(tax)
+                            }
+                        )
                         
                         // FINANCIAL SUMMARY SECTION
                         financialSummarySection
@@ -194,340 +235,6 @@ struct ProposalDetailView: View {
         } message: {
             Text("Are you sure you want to delete this item from the proposal?")
         }
-    }
-    
-    private func openEditItemView(for item: ProposalItem) {
-        itemToEdit = item
-        showEditItemSheet = true
-    }
-    
-    // MARK: - Products Section with Fixed Table Headers
-    private var productsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Products")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                
-                Spacer()
-                
-                Button(action: { showingItemSelection = true }) {
-                    Label("Add Products", systemImage: "plus")
-                        .foregroundColor(.blue)
-                }
-            }
-            
-            if proposal.itemsArray.isEmpty {
-                Text("No products added yet")
-                    .foregroundColor(.gray)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color.black.opacity(0.2))
-                    .cornerRadius(10)
-            } else {
-                // Product table with fixed header alignment
-                VStack(spacing: 0) {
-                    // Table header row - Fixed alignment
-                    HStack(spacing: 0) {
-                        TableHeaderCell(title: "Product Name", width: 180, alignment: .leading)
-                        TableHeaderCell(title: "Qty", width: 50, alignment: .center)
-                        TableHeaderCell(title: "Unit Partner Price", width: 120, alignment: .trailing)
-                        TableHeaderCell(title: "Unit List Price", width: 120, alignment: .trailing)
-                        TableHeaderCell(title: "Multiplier", width: 80, alignment: .center)
-                        TableHeaderCell(title: "Discount", width: 80, alignment: .center)
-                        TableHeaderCell(title: "Ext Partner Price", width: 120, alignment: .trailing)
-                        TableHeaderCell(title: "Ext List Price", width: 120, alignment: .trailing)
-                        TableHeaderCell(title: "Ext Customer Price", width: 120, alignment: .trailing)
-                        TableHeaderCell(title: "Total Profit", width: 100, alignment: .trailing)
-                        TableHeaderCell(title: "Custom Tax?", width: 90, alignment: .center)
-                        TableHeaderCell(title: "Act", width: 60, alignment: .center, isLast: true)
-                    }
-                    .frame(height: 40)
-                    .background(Color.black.opacity(0.3))
-                    
-                    Divider().background(Color.gray.opacity(0.5))
-                    
-                    // Data rows
-                    ScrollView {
-                        VStack(spacing: 0) {
-                            ForEach(proposal.itemsArray, id: \.self) { item in
-                                HStack(spacing: 0) {
-                                    // Product Name and code
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(item.productName)
-                                            .font(.system(size: 14))
-                                            .foregroundColor(.white)
-                                        Text(item.productCode)
-                                            .font(.system(size: 12))
-                                            .foregroundColor(.gray)
-                                    }
-                                    .frame(width: 180, alignment: .leading)
-                                    .padding(.horizontal, 5)
-                                    
-                                    TableDivider()
-                                    
-                                    // Quantity
-                                    Text("\(Int(item.quantity))")
-                                        .font(.system(size: 14))
-                                        .frame(width: 50, alignment: .center)
-                                        .padding(.horizontal, 5)
-                                    
-                                    TableDivider()
-                                    
-                                    // Unit Partner Price
-                                    let partnerPrice = item.product?.partnerPrice ?? 0
-                                    Text(String(format: "%.2f", partnerPrice))
-                                        .font(.system(size: 14))
-                                        .frame(width: 120, alignment: .trailing)
-                                        .padding(.horizontal, 5)
-                                    
-                                    TableDivider()
-                                    
-                                    // Unit List Price
-                                    let listPrice = item.product?.listPrice ?? 0
-                                    Text(String(format: "%.2f", listPrice))
-                                        .font(.system(size: 14))
-                                        .frame(width: 120, alignment: .trailing)
-                                        .padding(.horizontal, 5)
-                                    
-                                    TableDivider()
-                                    
-                                    // Multiplier
-                                    Text(String(format: "%.2f", calculateMultiplier(item)))
-                                        .font(.system(size: 14))
-                                        .frame(width: 80, alignment: .center)
-                                        .padding(.horizontal, 5)
-                                    
-                                    TableDivider()
-                                    
-                                    // Discount
-                                    Text(String(format: "%.1f%%", item.discount))
-                                        .font(.system(size: 14))
-                                        .frame(width: 80, alignment: .center)
-                                        .padding(.horizontal, 5)
-                                    
-                                    TableDivider()
-                                    
-                                    // Extended Partner Price
-                                    let extPartnerPrice = partnerPrice * item.quantity
-                                    Text(String(format: "%.2f", extPartnerPrice))
-                                        .font(.system(size: 14))
-                                        .frame(width: 120, alignment: .trailing)
-                                        .padding(.horizontal, 5)
-                                    
-                                    TableDivider()
-                                    
-                                    // Extended List Price
-                                    let extListPrice = listPrice * item.quantity
-                                    Text(String(format: "%.2f", extListPrice))
-                                        .font(.system(size: 14))
-                                        .frame(width: 120, alignment: .trailing)
-                                        .padding(.horizontal, 5)
-                                    
-                                    TableDivider()
-                                    
-                                    // Extended Customer Price
-                                    Text(String(format: "%.2f", item.amount))
-                                        .font(.system(size: 14))
-                                        .frame(width: 120, alignment: .trailing)
-                                        .padding(.horizontal, 5)
-                                    
-                                    TableDivider()
-                                    
-                                    // Total Profit
-                                    let profit = item.amount - extPartnerPrice
-                                    Text(String(format: "%.2f", profit))
-                                        .font(.system(size: 14))
-                                        .foregroundColor(profit > 0 ? .green : .red)
-                                        .frame(width: 100, alignment: .trailing)
-                                        .padding(.horizontal, 5)
-                                    
-                                    TableDivider()
-                                    
-                                    // Custom Tax?
-                                    Text("No")
-                                        .font(.system(size: 14))
-                                        .frame(width: 90, alignment: .center)
-                                        .padding(.horizontal, 5)
-                                    
-                                    TableDivider()
-                                    
-                                    // Action buttons
-                                    HStack(spacing: 15) {
-                                        Button(action: {
-                                            openEditItemView(for: item)
-                                        }) {
-                                            Image(systemName: "pencil")
-                                                .foregroundColor(.blue)
-                                        }
-                                        
-                                        Button(action: {
-                                            itemToDelete = item
-                                            showDeleteConfirmation = true
-                                        }) {
-                                            Image(systemName: "trash")
-                                                .foregroundColor(.red)
-                                        }
-                                    }
-                                    .frame(width: 60, alignment: .center)
-                                }
-                                .padding(.vertical, 8)
-                                .background(Color.black.opacity(0.2))
-                                
-                                Divider().background(Color.gray.opacity(0.5))
-                            }
-                        }
-                    }
-                }
-                .background(Color.black.opacity(0.1))
-                .cornerRadius(10)
-            }
-        }
-        .padding(.horizontal)
-    }
-    
-    // MARK: - Fixed Table Header Components
-    private struct TableHeaderCell: View {
-        let title: String
-        let width: CGFloat
-        let alignment: Alignment
-        var isLast: Bool = false
-        
-        var body: some View {
-            Text(title)
-                .font(.caption)
-                .fontWeight(.bold)
-                .frame(width: width, height: 40, alignment: alignment)
-                .padding(.horizontal, 5)
-                .background(Color.clear)
-                .overlay(
-                    Rectangle()
-                        .frame(width: 1, height: 30)
-                        .foregroundColor(Color.gray.opacity(0.5)),
-                    alignment: .trailing
-                )
-                .opacity(isLast ? 0 : 1)
-        }
-    }
-    
-    private struct TableDivider: View {
-        var body: some View {
-            Rectangle()
-                .fill(Color.gray.opacity(0.5))
-                .frame(width: 1, height: 30)
-        }
-    }
-    
-    // MARK: - Engineering Section
-    private var engineeringSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Engineering")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                
-                if !proposal.engineeringArray.isEmpty {
-                    Text("(\(proposal.engineeringArray.count))")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                }
-                
-                Spacer()
-                
-                Button(action: { showingEngineeringForm = true }) {
-                    Label("Add", systemImage: "plus")
-                        .foregroundColor(.blue)
-                }
-            }
-            
-            EngineeringTableView(
-                proposal,
-                onDelete: { engineering in
-                    deleteEngineering(engineering)
-                },
-                onEdit: { engineering in
-                    engineeringToEdit = engineering
-                    showEditEngineeringSheet = true
-                }
-            )
-        }
-        .padding(.horizontal)
-    }
-    
-    // MARK: - Expenses Section
-    private var expensesSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Expenses")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                
-                if !proposal.expensesArray.isEmpty {
-                    Text("(\(proposal.expensesArray.count))")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                }
-                
-                Spacer()
-                
-                Button(action: { showingExpensesForm = true }) {
-                    Label("Add", systemImage: "plus")
-                        .foregroundColor(.blue)
-                }
-            }
-            
-            ExpensesTableView(
-                proposal,
-                onDelete: { expense in
-                    deleteExpense(expense)
-                },
-                onEdit: { expense in
-                    expenseToEdit = expense
-                    showEditExpenseSheet = true
-                }
-            )
-        }
-        .padding(.horizontal)
-    }
-    
-    // MARK: - Custom Taxes Section
-    private var customTaxesSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Custom Taxes")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                
-                if !proposal.taxesArray.isEmpty {
-                    Text("(\(proposal.taxesArray.count))")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                }
-                
-                Spacer()
-                
-                Button(action: { showingCustomTaxForm = true }) {
-                    Label("Add", systemImage: "plus")
-                        .foregroundColor(.blue)
-                }
-            }
-            
-            CustomTaxesTableView(
-                proposal,
-                onDelete: { tax in
-                    deleteTax(tax)
-                },
-                onEdit: { tax in
-                    taxToEdit = tax
-                    showEditTaxSheet = true
-                }
-            )
-        }
-        .padding(.horizontal)
     }
     
     // MARK: - Financial Summary Section
@@ -724,19 +431,6 @@ struct ProposalDetailView: View {
     
     // MARK: - Helper Methods
     
-    // Helper method to calculate multiplier value
-    private func calculateMultiplier(_ item: ProposalItem) -> Double {
-        // Calculate it based on the formula
-        let listPrice = item.product?.listPrice ?? 0
-        if listPrice > 0 {
-            let discountFactor = 1.0 - (item.discount / 100.0)
-            if discountFactor > 0 {
-                return item.unitPrice / (listPrice * discountFactor)
-            }
-        }
-        return 1.0 // Default value
-    }
-    
     private func calculatePartnerCost() -> Double {
         var totalCost = 0.0
         
@@ -873,7 +567,6 @@ struct ProposalDetailView: View {
         commentText = ""
     }
 }
-
 // MARK: - Proposal Header Section
 struct ProposalHeaderSection: View {
     let proposal: Proposal

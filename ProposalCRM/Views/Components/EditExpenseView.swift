@@ -12,7 +12,7 @@
 import SwiftUI
 import CoreData
 
-struct EditExpenseView: View {
+struct EditExpenseView_: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.presentationMode) var presentationMode
     @ObservedObject var expense: Expense

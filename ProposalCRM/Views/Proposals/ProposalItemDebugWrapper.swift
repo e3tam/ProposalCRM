@@ -5,12 +5,6 @@
 //  Created by Ali Sami Gözükırmızı on 21.04.2025.
 //
 
-
-//
-//  ProposalItemDebugWrapper.swift
-//  ProposalCRM
-//
-
 import SwiftUI
 import CoreData
 
@@ -21,60 +15,39 @@ struct ProposalItemDebugWrapper: View {
     @Binding var didSave: Bool
     var onSave: () -> Void
     
-    @State private var loadedItem: ProposalItem?
-    @State private var isLoaded = false
-    
-    var body: some View {
-        Group {
-            if isLoaded, let loadedItem = loadedItem {
-                EditProposalItemView(
-                    item: loadedItem,
-                    context: viewContext,
-                    didSave: $didSave,
-                    onSave: onSave
-                )
-            } else {
-                ProgressView("Loading item data...")
-                    .onAppear {
-                        loadItem()
-                    }
+    init(item: ProposalItem, didSave: Binding<Bool>, onSave: @escaping () -> Void) {
+        self.item = item
+        self._didSave = didSave
+        self.onSave = onSave
+        
+        // Pre-load the data in the initializer
+        let context = item.managedObjectContext
+        if let context = context {
+            context.performAndWait {
+                if item.isFault {
+                    context.refresh(item, mergeChanges: true)
+                }
+                
+                if let product = item.product, product.isFault {
+                    context.refresh(product, mergeChanges: true)
+                }
+                
+                // Force load properties
+                _ = item.quantity
+                _ = item.discount
+                _ = item.unitPrice
+                _ = item.product?.name
+                _ = item.product?.listPrice
+                _ = item.product?.partnerPrice
             }
         }
     }
     
-    private func loadItem() {
-        // Create a fetch request for the specific item
-        let fetchRequest: NSFetchRequest<ProposalItem> = ProposalItem.fetchRequest()
-        fetchRequest.predicate = NSPredicate(format: "self == %@", item)
-        fetchRequest.relationshipKeyPathsForPrefetching = ["product", "proposal"]
-        
-        do {
-            // Fetch the item to ensure it's fully loaded
-            let fetchedItems = try viewContext.fetch(fetchRequest)
-            if let fetchedItem = fetchedItems.first {
-                // Ensure product is loaded
-                if let product = fetchedItem.product, product.isFault {
-                    viewContext.refresh(product, mergeChanges: true)
-                }
-                
-                // Print debug info
-                print("Loading item - Quantity: \(fetchedItem.quantity), Discount: \(fetchedItem.discount), UnitPrice: \(fetchedItem.unitPrice)")
-                print("Product name: \(fetchedItem.product?.name ?? "No name")")
-                print("Product list price: \(fetchedItem.product?.listPrice ?? 0)")
-                
-                loadedItem = fetchedItem
-                isLoaded = true
-            } else {
-                // Fallback to original item
-                print("Failed to fetch item, using original")
-                loadedItem = item
-                isLoaded = true
-            }
-        } catch {
-            print("Error fetching item: \(error)")
-            // Fallback to the original item
-            loadedItem = item
-            isLoaded = true
-        }
+    var body: some View {
+        EditProposalItemView(
+            item: item,
+            didSave: $didSave,
+            onSave: onSave
+        )
     }
 }

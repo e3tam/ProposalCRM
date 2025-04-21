@@ -12,7 +12,7 @@
 import SwiftUI
 import CoreData
 
-struct EditEngineeringView: View {
+struct EditEngineeringView_: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.presentationMode) var presentationMode
     @ObservedObject var engineering: Engineering
