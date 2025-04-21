@@ -3,6 +3,8 @@
 
 import SwiftUI
 
+import SwiftUI
+
 struct ProductsTableSection: View {
     let proposal: Proposal
     let onAdd: () -> Void
@@ -25,6 +27,7 @@ struct ProductsTableSection: View {
                 }
             }
             
+            // This is where we use our custom ProductTableView
             ProductTableView(
                 proposal: proposal,
                 onDelete: onDelete,
@@ -34,6 +37,8 @@ struct ProductsTableSection: View {
         .padding(.horizontal)
     }
 }
+
+
 
 // This implementation can stay in the same file as ProductsTableSection
 // or you can move it to its own file

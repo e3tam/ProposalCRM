@@ -1,23 +1,24 @@
-// ProductTableView.swift
-// Broken into smaller components to prevent compiler type-checking issues
+// File: ProposalCRM/Views/Products/ProductTableView.swift
+// Displays the table of products within a proposal detail view.
+// CORRECTED: Ensures non-optional item.productCode is handled correctly.
 
 import SwiftUI
 import CoreData
 
-// MARK: - Main Table View
+// MARK: - Main Product Table View
 struct ProductTableView: View {
     @ObservedObject var proposal: Proposal
     let onDelete: (ProposalItem) -> Void
     let onEdit: (ProposalItem) -> Void
     @Environment(\.colorScheme) var colorScheme
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Table header
-            ProductTableHeader()
-            
+            ProductTableHeader() // Uses HeaderCell internally
+
             Divider().background(Color.gray)
-            
+
             // Main table content with rows
             if proposal.itemsArray.isEmpty {
                 EmptyProductsView()
@@ -49,56 +50,33 @@ struct EmptyProductsView: View {
     }
 }
 
-// MARK: - Table Header
+// MARK: - Table Header - Uses HeaderCell
 struct ProductTableHeader: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: true) {
             HStack(spacing: 0) {
-                // Product Name
                 HeaderCell(title: "Product Name", width: 180, alignment: .leading)
                 VerticalDivider()
-                
-                // Qty
                 HeaderCell(title: "Qty", width: 50, alignment: .center)
                 VerticalDivider()
-                
-                // Unit Partner Price
                 HeaderCell(title: "Unit Partner Price", width: 120, alignment: .trailing)
                 VerticalDivider()
-                
-                // Unit List Price
                 HeaderCell(title: "Unit List Price", width: 120, alignment: .trailing)
                 VerticalDivider()
-                
-                // Multiplier
                 HeaderCell(title: "Multiplier", width: 80, alignment: .center)
                 VerticalDivider()
-                
-                // Discount
                 HeaderCell(title: "Discount", width: 80, alignment: .center)
                 VerticalDivider()
-                
-                // Ext Partner Price
                 HeaderCell(title: "Ext Partner Price", width: 120, alignment: .trailing)
                 VerticalDivider()
-                
-                // Ext List Price
                 HeaderCell(title: "Ext List Price", width: 120, alignment: .trailing)
                 VerticalDivider()
-                
-                // Ext Customer Price
                 HeaderCell(title: "Ext Customer Price", width: 120, alignment: .trailing)
                 VerticalDivider()
-                
-                // Total Profit
                 HeaderCell(title: "Total Profit", width: 100, alignment: .trailing)
                 VerticalDivider()
-                
-                // Custom Tax?
-                HeaderCell(title: "Custom Tax?", width: 90, alignment: .center)
+                HeaderCell(title: "Custom Tax?", width: 90, alignment: .center) // Assumed based on header
                 VerticalDivider()
-                
-                // Actions
                 HeaderCell(title: "Act", width: 60, alignment: .center)
             }
             .padding(.vertical, 10)
@@ -112,7 +90,7 @@ struct ProductRowsView: View {
     @ObservedObject var proposal: Proposal
     let onDelete: (ProposalItem) -> Void
     let onEdit: (ProposalItem) -> Void
-    
+
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
@@ -122,7 +100,6 @@ struct ProductRowsView: View {
                         onDelete: onDelete,
                         onEdit: onEdit
                     )
-                    
                     Divider().background(Color.gray.opacity(0.5))
                 }
             }
@@ -130,130 +107,113 @@ struct ProductRowsView: View {
     }
 }
 
-// MARK: - Individual Product Row
+// MARK: - Individual Product Row - Corrected productCode handling
 struct ProductRow: View {
     let item: ProposalItem
     let onDelete: (ProposalItem) -> Void
     let onEdit: (ProposalItem) -> Void
-    
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: true) {
             HStack(spacing: 0) {
-                // Product Name with code
+                // Product Name & Code
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.productName)
                         .font(.system(size: 14))
                         .foregroundColor(.white)
-                    if let code = item.product?.code, !code.isEmpty {
-                        Text(code)
+
+                    // --- CORRECT HANDLING for non-optional productCode ---
+                    let code = item.productCode // Directly assign the non-optional String
+                    if !code.isEmpty && code != "Unknown Code" { // Check if it's not empty AND not the default placeholder
+                        Text(code) // Line 124 (Now inside a standard 'if')
                             .font(.system(size: 12))
                             .foregroundColor(.gray)
                     }
+                    // --- End Correct Handling ---
+
                 }
                 .frame(width: 180, alignment: .leading)
                 .padding(.horizontal, 5)
-                
                 VerticalDivider()
-                
+
                 // Quantity
                 Text("\(Int(item.quantity))")
                     .font(.system(size: 14))
                     .frame(width: 50, alignment: .center)
                     .padding(.horizontal, 5)
-                
                 VerticalDivider()
-                
-                // Unit Partner Price
-                let partnerPrice = item.product?.partnerPrice ?? 0
-                Text(formatEuro(partnerPrice))
+
+                // Unit Partner Price (Uses extension which now formats)
+                Text(item.formattedUnitPartnerPrice)
                     .font(.system(size: 14))
                     .frame(width: 120, alignment: .trailing)
                     .padding(.horizontal, 5)
-                
                 VerticalDivider()
-                
-                // Unit List Price
-                let listPrice = item.product?.listPrice ?? 0
-                Text(formatEuro(listPrice))
+
+                // Unit List Price (Uses extension which now formats)
+                Text(item.formattedUnitListPrice)
                     .font(.system(size: 14))
                     .frame(width: 120, alignment: .trailing)
                     .padding(.horizontal, 5)
-                
                 VerticalDivider()
-                
-                // Multiplier (calculate or use default 1.00)
-                let multiplier = calculateMultiplier(item: item)
-                Text(String(format: "%.2f", multiplier))
+
+                // Multiplier (Uses extension which now formats)
+                Text(item.formattedMultiplier)
                     .font(.system(size: 14))
                     .frame(width: 80, alignment: .center)
                     .padding(.horizontal, 5)
-                
                 VerticalDivider()
-                
-                // Discount
-                Text(String(format: "%.1f%%", item.discount))
+
+                // Discount (Uses extension which now formats)
+                 Text(Formatters.formatPercent(item.discount)) // Use % formatter directly
                     .font(.system(size: 14))
                     .frame(width: 80, alignment: .center)
                     .padding(.horizontal, 5)
-                
                 VerticalDivider()
-                
-                // Ext Partner Price
-                let extPartnerPrice = partnerPrice * item.quantity
-                Text(formatEuro(extPartnerPrice))
+
+                // Ext Partner Price (Uses extension which now formats)
+                Text(item.formattedExtendedPartnerPrice)
                     .font(.system(size: 14))
                     .frame(width: 120, alignment: .trailing)
                     .padding(.horizontal, 5)
-                
                 VerticalDivider()
-                
-                // Ext List Price
-                let extListPrice = listPrice * item.quantity
-                Text(formatEuro(extListPrice))
+
+                // Ext List Price (Uses extension which now formats)
+                Text(item.formattedExtendedListPrice)
                     .font(.system(size: 14))
                     .frame(width: 120, alignment: .trailing)
                     .padding(.horizontal, 5)
-                
                 VerticalDivider()
-                
-                // Ext Customer Price (amount)
-                Text(formatEuro(item.amount))
+
+                // Ext Customer Price (Uses extension which now formats)
+                Text(item.formattedExtendedCustomerPrice) // Uses item.amount via extension
                     .font(.system(size: 14))
                     .frame(width: 120, alignment: .trailing)
                     .padding(.horizontal, 5)
-                
                 VerticalDivider()
-                
-                // Total Profit
-                let profit = item.amount - extPartnerPrice
-                Text(formatEuro(profit))
+
+                // Total Profit (Uses extension which now formats)
+                Text(item.formattedProfit)
                     .font(.system(size: 14))
-                    .foregroundColor(profit > 0 ? .green : .red)
+                    .foregroundColor(item.calculatedProfit >= 0 ? .green : .red) // Use calculated value for color
                     .frame(width: 100, alignment: .trailing)
                     .padding(.horizontal, 5)
-                
                 VerticalDivider()
-                
+
                 // Custom Tax?
-                Text("No")
+                Text(item.applyCustomTax ? "Yes" : "No")
                     .font(.system(size: 14))
                     .frame(width: 90, alignment: .center)
                     .padding(.horizontal, 5)
-                
                 VerticalDivider()
-                
+
                 // Action buttons
                 HStack(spacing: 15) {
-                    Button(action: {
-                        onEdit(item)
-                    }) {
+                    Button(action: { onEdit(item) }) {
                         Image(systemName: "pencil")
                             .foregroundColor(.blue)
                     }
-                    
-                    Button(action: {
-                        onDelete(item)
-                    }) {
+                    Button(action: { onDelete(item) }) {
                         Image(systemName: "trash")
                             .foregroundColor(.red)
                     }
@@ -264,29 +224,6 @@ struct ProductRow: View {
             .background(Color.black.opacity(0.2))
         }
     }
-    
-    // Helper function to calculate multiplier
-    private func calculateMultiplier(item: ProposalItem) -> Double {
-        let listPrice = item.product?.listPrice ?? 1.0
-        let discountFactor = 1.0 - (item.discount / 100.0)
-        
-        if listPrice > 0 && discountFactor > 0 {
-            return item.unitPrice / (listPrice * discountFactor)
-        }
-        return 1.0
-    }
-    
-    // Format currency to euros
-    private func formatEuro(_ value: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "EUR"
-        formatter.currencySymbol = "€"
-        formatter.minimumFractionDigits = 2
-        formatter.maximumFractionDigits = 2
-        
-        return formatter.string(from: NSNumber(value: value)) ?? "€\(String(format: "%.2f", value))"
-    }
 }
 
 // MARK: - Reusable Components
@@ -295,31 +232,22 @@ struct HeaderCell: View {
     let title: String
     let width: CGFloat
     let alignment: Alignment
-    
+
     var body: some View {
         Text(title)
             .font(.caption)
             .fontWeight(.bold)
             .frame(width: width, alignment: alignment)
             .padding(.horizontal, 5)
+            .foregroundColor(.white)
     }
 }
 
 struct VerticalDivider: View {
     var body: some View {
-        Divider().frame(height: 36)
-    }
-}
-
-// MARK: - Helper Extension
-extension NumberFormatter {
-    static var euroFormatter: NumberFormatter {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "EUR"
-        formatter.currencySymbol = "€"
-        formatter.minimumFractionDigits = 2
-        formatter.maximumFractionDigits = 2
-        return formatter
+        Divider()
+            .frame(height: 36)
+            .background(Color.gray)
+            .opacity(0.5)
     }
 }

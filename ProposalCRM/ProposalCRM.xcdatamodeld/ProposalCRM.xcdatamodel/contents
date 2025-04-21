@@ -68,8 +68,10 @@
     </entity>
     <entity name="ProposalItem" representedClassName="ProposalItem" syncable="YES" codeGenerationType="class">
         <attribute name="amount" attributeType="Double" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="applyCustomTax" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="discount" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="multiplier" optional="YES" attributeType="Double" defaultValueString="1" usesScalarValueType="YES"/>
         <attribute name="quantity" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="unitPrice" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <relationship name="product" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Product" inverseName="proposalItems" inverseEntity="Product"/>

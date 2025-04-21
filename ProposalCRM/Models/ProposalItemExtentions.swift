@@ -1,152 +1,149 @@
-// ProposalItemExtensions.swift
-// Extensions for ProposalItem to handle the new calculation fields
+// File: ProposalCRM/Models/ProposalItemExtentions.swift
+// Extensions for ProposalItem with corrected accessors and Euro formatting.
+// UPDATED: Removed redundant 'multiplier' computed property.
 
 import Foundation
 import CoreData
 
+// MARK: - ProposalItem Extension
 extension ProposalItem {
-    // MARK: - Dynamic Properties
-    // These properties are implemented as computed properties
-    // but should be added as actual attributes to the Core Data model
-    
-    // Multiplier property (default: 1.0)
-    var multiplier: Double {
-        get {
-            return value(forKey: "multiplier") as? Double ?? 1.0
-        }
-        set {
-            setValue(newValue, forKey: "multiplier")
-        }
-    }
-    
-    // Partner price property (from the product)
+
+    // MARK: - Access to Model Attributes / Corrected Properties
+
+    // --- REMOVED applyCustomTax computed property ---
+    // Access 'applyCustomTax' directly via the Core Data generated property (item.applyCustomTax)
+
+    // --- REMOVED multiplier computed property ---
+    // Access 'multiplier' directly via the Core Data generated property (item.multiplier)
+    // Ensure it was added to the .xcdatamodeld (Double, default: 1.0)
+
+    /// The partner price for this item, obtained from the associated Product.
     var partnerPrice: Double {
         get {
-            return value(forKey: "partnerPrice") as? Double ?? product?.partnerPrice ?? 0
+            // Directly access the partnerPrice from the related product.
+            return self.product?.partnerPrice ?? 0.0
         }
-        set {
-            setValue(newValue, forKey: "partnerPrice")
-        }
+        // Setter removed.
     }
-    
-    // Apply custom tax flag
 
-    
-    // Custom description
+    /// Custom description for this specific proposal item.
+    /// Note: Ensure 'customDescription' (String, optional) exists in your model.
+    /// Using KVC as fallback if subclass not generated/used. Prefer direct access.
     var customDescription: String {
         get {
-            return value(forKey: "customDescription") as? String ?? ""
+            return value(forKey: "customDescription") as? String ?? "" // Original KVC
         }
         set {
-            setValue(newValue, forKey: "customDescription")
+            setValue(newValue, forKey: "customDescription") // Original KVC
         }
     }
-    
-    // Profit
-    var profit: Double {
-        get {
-            return value(forKey: "profit") as? Double ?? 0
-        }
-        set {
-            setValue(newValue, forKey: "profit")
-        }
-    }
-    
-    // MARK: - Calculated Properties
-    
-    // Unit list price (from the product)
+
+    // MARK: - Calculated Properties (Values derived from other attributes)
+
+    /// The list price obtained directly from the associated Product entity.
     var unitListPrice: Double {
         return product?.listPrice ?? 0
     }
-    
-    // Extended partner price
+
+    /// The total partner price for the quantity of this item (Quantity * Partner Price).
     var extendedPartnerPrice: Double {
-        return partnerPrice * quantity
+        return partnerPrice * quantity // Uses the corrected partnerPrice computed property
     }
-    
-    // Extended list price
+
+    /// The total list price for the quantity of this item (Quantity * Unit List Price).
     var extendedListPrice: Double {
         return unitListPrice * quantity
     }
-    
-    // Extended customer price (with multiplier and discount)
+
+    /// The final calculated price for the customer for the extended quantity.
+    /// This should match the stored `amount` attribute.
     var extendedCustomerPrice: Double {
-        return extendedListPrice * multiplier * (1 - discount / 100)
+        // Now relies on the 'multiplier' attribute existing directly on the item
+        return unitListPrice * self.multiplier * (1 - discount / 100) * quantity
+        // Or return self.amount if that's reliably calculated elsewhere
+        // return self.amount
     }
-    
-    // Discount ratio (partner/list price)
-    var discountRatio: Double {
-        if unitListPrice == 0 {
-            return 0
-        }
-        return (partnerPrice / unitListPrice) * 100
-    }
-    
-    // Calculated profit
+
+    /// The calculated profit for this item line (Extended Customer Price - Extended Partner Price).
     var calculatedProfit: Double {
-        return extendedCustomerPrice - extendedPartnerPrice
+        // Use self.amount as the final customer price
+        return self.amount - extendedPartnerPrice // extendedPartnerPrice uses the corrected partnerPrice
     }
-    
-    // Profit margin percentage
+
+    /// The calculated profit margin percentage for this item line.
     var profitMargin: Double {
-        if extendedCustomerPrice == 0 {
+        if self.amount <= 0 { // Use self.amount (final price) as the denominator
             return 0
         }
-        return (calculatedProfit / extendedCustomerPrice) * 100
+        return (calculatedProfit / self.amount) * 100 // calculatedProfit uses the corrected partnerPrice
     }
-    
-    // Formatted strings for display
+
+    // MARK: - Formatted Strings for Display (Using Euro Formatter)
+
+    /// Formatted Unit List Price (Euro).
     var formattedUnitListPrice: String {
-        return String(format: "%.2f", unitListPrice)
+        return Formatters.formatEuro(unitListPrice)
     }
-    
+
+    /// Formatted Unit Partner Price (Euro).
     var formattedUnitPartnerPrice: String {
-        return String(format: "%.2f", partnerPrice)
+        return Formatters.formatEuro(partnerPrice) // Uses the corrected partnerPrice computed property
     }
-    
+
+    /// Formatted Extended List Price (Euro).
     var formattedExtendedListPrice: String {
-        return String(format: "%.2f", extendedListPrice)
+        return Formatters.formatEuro(extendedListPrice)
     }
-    
+
+    /// Formatted Extended Partner Price (Euro).
     var formattedExtendedPartnerPrice: String {
-        return String(format: "%.2f", extendedPartnerPrice)
+        return Formatters.formatEuro(extendedPartnerPrice) // Uses the corrected partnerPrice computed property
     }
-    
+
+    /// Formatted Extended Customer Price (Euro). Represents the final line item total.
     var formattedExtendedCustomerPrice: String {
-        return String(format: "%.2f", extendedCustomerPrice)
+        return Formatters.formatEuro(self.amount) // Format the stored amount
     }
-    
+
+    /// Formatted Total Profit for this line item (Euro).
     var formattedProfit: String {
-        return String(format: "%.2f", calculatedProfit)
+        return Formatters.formatEuro(calculatedProfit) // Uses the corrected partnerPrice computed property
     }
-    
+
+    /// Formatted Profit Margin (Percentage).
     var formattedProfitMargin: String {
-        return String(format: "%.1f%%", profitMargin)
+        return Formatters.formatPercent(profitMargin)
     }
-    
+
+    /// Formatted Multiplier (e.g., "1.10x").
     var formattedMultiplier: String {
-        return String(format: "%.2fx", multiplier)
+         // Access the multiplier directly from the item
+        return String(format: "%.2fx", self.multiplier)
     }
 }
 
-// MARK: - Core Data Model Extension Guide
+// MARK: - Core Data Model Reminder
 /*
- To fully implement these changes, update your Core Data model by:
- 
- 1. Open ProposalCRM.xcdatamodeld in Xcode
- 2. Select the ProposalItem entity
- 3. Add the following attributes:
-    - multiplier: Double, default: 1.0
-    - partnerPrice: Double, default: 0.0
+ REMINDER: Ensure your Core Data model (`ProposalCRM.xcdatamodeld`) for the
+ `ProposalItem` entity includes the necessary attributes like:
+
+    - quantity: Double
+    - unitPrice: Double
+    - discount: Double
+    - amount: Double
+    - multiplier: Double, default: 1.0      <- Make sure this is added!
     - applyCustomTax: Boolean, default: false
     - customDescription: String, optional
-    - profit: Double, default: 0.0
- 
- Note: Until you can update the Core Data model directly, this extension
- provides computed properties that use Core Data's dynamic features to
- store and retrieve these values. This is a temporary solution that will
- work but is not optimal for performance.
- 
- For a production app, you should properly update the Core Data model
- and run the migration process.
+    // - partnerPrice: Double <-- Should NOT be here, belongs on Product
+
+ AND ensure the `Product` entity has:
+    - code: String?
+    - name: String?
+    - desc: String?
+    - category: String?
+    - listPrice: Double
+    - partnerPrice: Double
+
+ If you made changes to the model, clean your build folder (Product > Clean Build Folder)
+ and rebuild the project. Consider generating NSManagedObject subclasses for type safety.
  */
